@@ -28,8 +28,9 @@ from uuid import UUID
 import asyncpg
 from fastapi import WebSocket
 
-from app import game
+from app import game, glicko2
 from app.events import log_event
+from app.ratings import apply_match_result
 from app.scoring import AlreadyAnswered, ScoredAnswer, score_attempt
 
 logger = logging.getLogger("outcoded.match")
@@ -55,10 +56,11 @@ class Player:
 
 
 class MatchRoom:
-    def __init__(self, match_id: UUID, code: str, host_id: UUID, pool: asyncpg.Pool, grace_ms: int):
+    def __init__(self, match_id: UUID, code: str, host_id: UUID, rated: bool, pool: asyncpg.Pool, grace_ms: int):
         self.match_id = match_id
         self.code = code
         self.host_id = host_id
+        self.rated = rated
         self.pool = pool
         self.grace_ms = grace_ms
         self.players: dict[UUID, Player] = {}
@@ -325,7 +327,19 @@ class MatchRoom:
                 host_score=host_score,
                 guest_score=guest_score,
                 forfeit=forfeited_by is not None,
+                rated=self.rated,
             )
+
+            # Rated matches move both players' ratings (a forfeit counts as a loss).
+            rating_changes: dict[UUID, dict] = {}
+            if self.rated and guest is not None:
+                if winner is None:
+                    host_result = glicko2.DRAW
+                else:
+                    host_result = glicko2.WIN if winner == self.host_id else glicko2.LOSS
+                rating_changes = await apply_match_result(
+                    conn, self.match_id, self.host_id, guest.id, host_result
+                )
 
         for player in self.players.values():
             if player.id == forfeited_by:
@@ -340,6 +354,8 @@ class MatchRoom:
                     "forfeit": forfeited_by is not None,
                     "opponent": opponent.username if opponent else None,
                     "score": {"you": player.score, "opponent": opponent.score if opponent else 0},
+                    "rated": self.rated,
+                    "rating": rating_changes.get(player.id),
                 },
             )
         registry.forget(self.code)
@@ -397,12 +413,14 @@ class RoomRegistry:
             if room is None:
                 async with pool.acquire() as conn:
                     match = await conn.fetchrow(
-                        "select id, host_id from public.matches where code = $1 and status = 'waiting'",
+                        """
+                        select id, host_id, rated from public.matches where code = $1 and status = 'waiting'
+                        """,
                         code,
                     )
                 if match is None:
                     return None
-                room = MatchRoom(match["id"], code, match["host_id"], pool, grace_ms)
+                room = MatchRoom(match["id"], code, match["host_id"], match["rated"], pool, grace_ms)
                 self.rooms[code] = room
             return room
 
