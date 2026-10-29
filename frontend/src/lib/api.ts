@@ -26,13 +26,31 @@ export type AnswerResult = {
   explanation: string
 }
 
+export type Profile = {
+  id: string
+  username: string | null
+  rating: number
+  rating_deviation: number
+  created_at: string
+}
+
+// An error from our backend, carrying its HTTP status and readable message.
+export class ApiError extends Error {
+  status: number
+
+  constructor(status: number, message: string) {
+    super(message)
+    this.status = status
+  }
+}
+
 // Every request carries the player's sign-in token so the backend knows who they are.
-async function post<T>(path: string, body?: unknown): Promise<T> {
+async function request<T>(method: 'GET' | 'POST' | 'PUT', path: string, body?: unknown): Promise<T> {
   const { data } = await supabase.auth.getSession()
   const token = data.session?.access_token
 
   const response = await fetch(`${API_URL}${path}`, {
-    method: 'POST',
+    method,
     headers: {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -41,13 +59,22 @@ async function post<T>(path: string, body?: unknown): Promise<T> {
   })
 
   if (!response.ok) {
-    throw new Error(`API error ${response.status}: ${await response.text()}`)
+    let message = `Something went wrong (${response.status})`
+    try {
+      const error = await response.json()
+      if (typeof error.detail === 'string') message = error.detail
+    } catch {
+      // response wasn't JSON; keep the generic message
+    }
+    throw new ApiError(response.status, message)
   }
   return response.json() as Promise<T>
 }
 
 export const api = {
-  nextQuestion: () => post<NextQuestion>('/solo/next'),
+  me: () => request<Profile>('GET', '/me'),
+  setUsername: (username: string) => request<Profile>('PUT', '/me/username', { username }),
+  nextQuestion: () => request<NextQuestion>('POST', '/solo/next'),
   submitAnswer: (attemptId: string, choice: number | null) =>
-    post<AnswerResult>('/solo/answer', { attempt_id: attemptId, choice }),
+    request<AnswerResult>('POST', '/solo/answer', { attempt_id: attemptId, choice }),
 }

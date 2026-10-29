@@ -41,3 +41,6 @@ class Profile(BaseModel):
     rating: float
     rating_deviation: float
     created_at: datetime
+
+class UsernameRequest(BaseModel):
+    username: str = Field(pattern=r"^[A-Za-z0-9_]{3,20}$")

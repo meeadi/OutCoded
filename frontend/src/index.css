@@ -639,3 +639,60 @@ html[data-fx="off"] .bar {
     animation: none;
   }
 }
+
+/* ---------- Username picker ---------- */
+.picker-hint {
+  color: var(--sub);
+  font-size: 0.8rem;
+  margin-top: -12px;
+  margin-bottom: 8px;
+}
+
+.name-row {
+  display: flex;
+  gap: 8px;
+}
+
+.name-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.dice {
+  font-size: 1.4rem;
+  padding: 0 6px;
+  animation: roll 0.4s ease-out;
+}
+
+.dice:hover {
+  transform: scale(1.15);
+}
+
+@keyframes roll {
+  from { transform: rotate(-360deg) scale(0.6); }
+}
+
+.picker-rule {
+  color: var(--sub);
+  font-size: 0.75rem;
+  margin-top: -6px;
+  text-align: left;
+}
+
+.picker-rule.bad {
+  color: var(--wrong);
+}
+
+.you {
+  color: var(--accent);
+}
+
+html[data-fx="off"] .dice {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dice {
+    animation: none;
+  }
+}

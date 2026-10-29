@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react'
 import AuthForm from './components/AuthForm'
-import PuzzleRush from './components/PuzzleRush'
+import Home from './components/Home'
 import { useSession } from './hooks/useSession'
 import { prefersReducedMotion } from './lib/effects'
-import { supabase } from './lib/supabase'
 
 const THEMES = [
   { id: 'midnight', swatch: '#7c5cff' },
@@ -71,15 +70,8 @@ export default function App() {
 
         <main className="main">
           {loading ? null : session ? (
-            <div className="home">
-              <PuzzleRush effects={effects} />
-              <p className="signed-in">
-                signed in as {session.user.email} ·{' '}
-                <button className="link" onClick={() => supabase.auth.signOut()}>
-                  sign out
-                </button>
-              </p>
-            </div>
+            // The key makes Home start fresh if a different account signs in.
+            <Home key={session.user.id} effects={effects} />
           ) : (
             <AuthForm />
           )}
