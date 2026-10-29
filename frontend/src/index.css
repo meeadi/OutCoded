@@ -478,3 +478,164 @@ html[data-fx="off"] .timer {
     animation: none;
   }
 }
+
+/* ---------- Results ---------- */
+.results {
+  width: 100%;
+  max-width: 560px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+.results-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.rank {
+  font-size: 5rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--accent);
+  animation: slam 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.rank-S {
+  color: var(--correct);
+  text-shadow: 0 0 24px var(--correct);
+}
+
+.rank-D,
+.rank-F {
+  color: var(--wrong);
+}
+
+@keyframes slam {
+  from { transform: scale(4) rotate(-12deg); opacity: 0; }
+  to { transform: scale(1) rotate(0); opacity: 1; }
+}
+
+.rank-line {
+  color: var(--sub);
+  animation: fade-up 0.4s 0.35s ease-out backwards;
+}
+
+@keyframes fade-up {
+  from { transform: translateY(8px); opacity: 0; }
+}
+
+.results-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 32px;
+  animation: fade-up 0.4s 0.5s ease-out backwards;
+}
+
+.results-stats div {
+  display: flex;
+  flex-direction: column;
+}
+
+.stat-value {
+  font-size: 1.8rem;
+  font-weight: 700;
+}
+
+.stat-label {
+  color: var(--sub);
+  font-size: 0.8rem;
+}
+
+.chart {
+  width: 100%;
+  height: 120px;
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  padding: 12px;
+  background: var(--surface);
+  border-radius: 8px;
+}
+
+.bar {
+  flex: 1;
+  border-radius: 3px 3px 0 0;
+  transform-origin: bottom;
+  animation: grow 0.4s ease-out backwards;
+}
+
+.bar {
+  position: relative;
+  transition: filter 0.15s ease;
+}
+
+.bar:hover {
+  filter: brightness(1.25);
+  z-index: 2; /* lift the hovered bar (and its label) above its neighbours */
+}
+
+/* Little label that pops up above a bar on hover. */
+.bar-tip {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  background: var(--text);
+  color: var(--bg);
+  font-size: 0.7rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease, transform 0.12s ease;
+  z-index: 1;
+}
+
+.bar:hover .bar-tip {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.bar-good {
+  background: var(--correct);
+}
+
+.bar-bad {
+  background: var(--wrong);
+}
+
+@keyframes grow {
+  from { transform: scaleY(0); }
+}
+
+.chart-caption,
+.hint {
+  color: var(--sub);
+  font-size: 0.75rem;
+  margin-top: -12px;
+}
+
+.results .btn-primary {
+  min-width: 200px;
+}
+
+html[data-fx="off"] .rank,
+html[data-fx="off"] .rank-line,
+html[data-fx="off"] .results-stats,
+html[data-fx="off"] .bar {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rank,
+  .rank-line,
+  .results-stats,
+  .bar {
+    animation: none;
+  }
+}

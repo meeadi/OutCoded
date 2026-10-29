@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, type AnswerResult, type NextQuestion } from '../lib/api'
 import { celebrate, punish } from '../lib/effects'
+import { currentStreak, SESSION_LENGTH, type Round } from '../lib/session'
+import Results from './Results'
 
-type Phase = 'loading' | 'question' | 'submitting' | 'result' | 'error'
+type Phase = 'loading' | 'question' | 'submitting' | 'result' | 'summary' | 'error'
 
 type Props = {
   effects: boolean
@@ -14,7 +16,7 @@ export default function PuzzleRush({ effects }: Props) {
   const [picked, setPicked] = useState<number | null>(null)
   const [result, setResult] = useState<AnswerResult | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [stats, setStats] = useState({ correct: 0, total: 0, streak: 0 })
+  const [rounds, setRounds] = useState<Round[]>([])
 
   const showQuestion = useCallback((next: NextQuestion) => {
     setCurrent(next)
@@ -33,6 +35,25 @@ export default function PuzzleRush({ effects }: Props) {
     api.nextQuestion().then(showQuestion).catch(showError)
   }, [showQuestion, showError])
 
+  // After the last question, show the summary instead of another question.
+  const advance = useCallback(() => {
+    if (rounds.length < SESSION_LENGTH) {
+      loadNext()
+      return
+    }
+    setPhase('summary')
+    const correct = rounds.filter((r) => r.correct).length
+    if (effects) {
+      if (correct >= 8) celebrate(10) // big burst
+      else if (correct <= 3) punish()
+    }
+  }, [rounds, effects, loadNext])
+
+  const restart = useCallback(() => {
+    setRounds([])
+    loadNext()
+  }, [loadNext])
+
   // choice is null when the timer ran out without an answer.
   const answer = useCallback(
     async (choice: number | null) => {
@@ -41,13 +62,10 @@ export default function PuzzleRush({ effects }: Props) {
       setPhase('submitting')
       try {
         const res = await api.submitAnswer(current.attempt_id, choice)
-        const streak = res.correct ? stats.streak + 1 : 0
+        const round = { correct: res.correct, timedOut: res.timed_out, ms: res.response_ms }
+        const streak = currentStreak([...rounds, round])
         setResult(res)
-        setStats((s) => ({
-          correct: s.correct + (res.correct ? 1 : 0),
-          total: s.total + 1,
-          streak,
-        }))
+        setRounds((previous) => [...previous, round])
         setPhase('result')
         if (effects) {
           if (res.correct) celebrate(streak)
@@ -57,7 +75,7 @@ export default function PuzzleRush({ effects }: Props) {
         showError(e)
       }
     },
-    [phase, current, stats.streak, effects, showError],
+    [phase, current, rounds, effects, showError],
   )
 
   // Load the first question when the component appears.
@@ -80,12 +98,16 @@ export default function PuzzleRush({ effects }: Props) {
         if (n >= 1 && n <= current.question.options.length) answer(n - 1)
       } else if (phase === 'result' && (event.key === 'Enter' || event.key === ' ')) {
         event.preventDefault()
-        loadNext()
+        advance()
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [phase, current, answer, loadNext])
+  }, [phase, current, answer, advance])
+
+  if (phase === 'summary') {
+    return <Results rounds={rounds} onRestart={restart} />
+  }
 
   if (phase === 'error') {
     return (
@@ -113,6 +135,8 @@ export default function PuzzleRush({ effects }: Props) {
     else if (result.response_ms < 2500) stamp = 'too easy'
   }
   const playState = phase === 'question' ? 'running' : 'paused'
+  const streak = currentStreak(rounds)
+  const isLast = rounds.length >= SESSION_LENGTH
 
   function optionClass(index: number) {
     if (!answered) return 'option'
@@ -125,11 +149,11 @@ export default function PuzzleRush({ effects }: Props) {
     <div className="rush">
       <div className="rush-stats">
         <span>
-          {stats.correct}/{stats.total}
+          {Math.min(rounds.length + (answered ? 0 : 1), SESSION_LENGTH)}/{SESSION_LENGTH}
         </span>
-        <span className={stats.streak >= 3 ? 'streak hot' : 'streak'}>
-          streak {stats.streak}
-          {stats.streak >= 5 && ' 🔥'}
+        <span className={streak >= 3 ? 'streak hot' : 'streak'}>
+          streak {streak}
+          {streak >= 5 && ' 🔥'}
         </span>
       </div>
 
@@ -188,8 +212,8 @@ export default function PuzzleRush({ effects }: Props) {
             {stamp && <span className="stamp">{stamp}</span>}
           </p>
           <p className="explanation">{result.explanation}</p>
-          <button className="link" onClick={loadNext}>
-            press enter for next →
+          <button className="link" onClick={advance}>
+            {isLast ? 'press enter for results →' : 'press enter for next →'}
           </button>
         </div>
       )}
