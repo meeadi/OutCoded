@@ -206,3 +206,144 @@ button {
   color: var(--sub);
   font-size: 0.85rem;
 }
+
+/* ---------- Puzzle rush ---------- */
+.rush {
+  width: 100%;
+  max-width: 720px;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.rush-stats {
+  display: flex;
+  justify-content: space-between;
+  color: var(--sub);
+  font-size: 0.85rem;
+}
+
+.streak.hot {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.timer {
+  height: 4px;
+  background: var(--surface);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.timer-fill {
+  height: 100%;
+  background: var(--accent);
+  transform-origin: left;
+  animation-name: drain;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+
+@keyframes drain {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
+.meta {
+  color: var(--sub);
+  font-size: 0.8rem;
+}
+
+.prompt {
+  font-size: 1.15rem;
+  font-weight: 400;
+  white-space: pre-line;
+}
+
+.code {
+  background: var(--surface);
+  border-radius: 8px;
+  padding: 16px 20px;
+  overflow-x: auto;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.option {
+  text-align: left;
+  background: var(--surface);
+  border: 2px solid transparent;
+  border-radius: 8px;
+  padding: 12px 14px;
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  transition: border-color 0.15s ease, opacity 0.2s ease, transform 0.1s ease;
+}
+
+.option:not(:disabled):hover {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.option:disabled {
+  cursor: default;
+}
+
+.option-key {
+  color: var(--sub);
+  font-size: 0.8rem;
+}
+
+.option.correct {
+  border-color: var(--correct);
+}
+
+.option.wrong {
+  border-color: var(--wrong);
+}
+
+.option.faded {
+  opacity: 0.4;
+}
+
+.verdict {
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+
+.verdict.good {
+  color: var(--correct);
+}
+
+.verdict.bad {
+  color: var(--wrong);
+}
+
+.verdict .time {
+  color: var(--sub);
+  font-size: 0.9rem;
+  font-weight: 400;
+}
+
+.explanation {
+  color: var(--sub);
+  margin: 4px 0 8px;
+}
+
+@media (max-width: 600px) {
+  .options {
+    grid-template-columns: 1fr;
+  }
+}

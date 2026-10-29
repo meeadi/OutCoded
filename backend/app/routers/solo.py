@@ -115,12 +115,14 @@ async def submit_answer(
             raise HTTPException(status.HTTP_409_CONFLICT, "Already answered")
 
         order = list(row["option_order"])
-        try:
-            chosen = game.to_original_index(body.choice, order)
-        except ValueError:
-            raise HTTPException(
-                status.HTTP_422_UNPROCESSABLE_ENTITY, "Choice out of range"
-            ) from None
+        chosen = None  # stays None when the player ran out of time without picking
+        if body.choice is not None:
+            try:
+                chosen = game.to_original_index(body.choice, order)
+            except ValueError:
+                raise HTTPException(
+                    status.HTTP_422_UNPROCESSABLE_ENTITY, "Choice out of range"
+                ) from None
 
         response_ms = row["elapsed_ms"]
         timed_out = game.is_timed_out(response_ms, row["time_limit_s"], settings.answer_grace_ms)

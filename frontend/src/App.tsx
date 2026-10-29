@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import AuthForm from './components/AuthForm'
+import PuzzleRush from './components/PuzzleRush'
 import { useSession } from './hooks/useSession'
 import { supabase } from './lib/supabase'
 
@@ -49,7 +50,7 @@ export default function App() {
       <main className="main">
         {loading ? null : session ? (
           <div className="home">
-            <p className="tagline">// outthink. outplay. outcode.</p>
+            <PuzzleRush />
             <p className="signed-in">
               signed in as {session.user.email} ·{' '}
               <button className="link" onClick={() => supabase.auth.signOut()}>

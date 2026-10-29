@@ -24,7 +24,7 @@ class NextQuestionResponse(BaseModel):
 
 class AnswerRequest(BaseModel):
     attempt_id: UUID
-    choice: int = Field(ge=0, le=3, description="Position of the option the player clicked (0-based)")
+    choice: int | None = Field(default=None, ge=0, le=3, description="Position of the option the player clicked (0-based), or null if time ran out")
 
 
 class AnswerResponse(BaseModel):
