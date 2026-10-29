@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { api, type AnswerResult, type NextQuestion } from '../lib/api'
 import { celebrate, punish } from '../lib/effects'
 import { currentStreak, SESSION_LENGTH, type Round } from '../lib/session'
+import QuestionCard from './QuestionCard'
 import Results from './Results'
 
 type Phase = 'loading' | 'question' | 'submitting' | 'result' | 'summary' | 'error'
@@ -134,16 +135,8 @@ export default function PuzzleRush({ effects }: Props) {
     if (remainingMs < 3000) stamp = 'clutch!'
     else if (result.response_ms < 2500) stamp = 'too easy'
   }
-  const playState = phase === 'question' ? 'running' : 'paused'
   const streak = currentStreak(rounds)
   const isLast = rounds.length >= SESSION_LENGTH
-
-  function optionClass(index: number) {
-    if (!answered) return 'option'
-    if (index === result!.correct_choice) return 'option correct'
-    if (index === picked) return 'option wrong'
-    return 'option faded'
-  }
 
   return (
     <div className="rush">
@@ -157,52 +150,15 @@ export default function PuzzleRush({ effects }: Props) {
         </span>
       </div>
 
-      {/* The key restarts the animations for every new question.
-          In the last 5 seconds the bar turns red and starts to glow. */}
-      <div
-        key={current.attempt_id}
-        className="timer"
-        style={{
-          animationDelay: `${Math.max(0, question.time_limit_s - 5)}s`,
-          animationPlayState: playState,
-        }}
-      >
-        <div
-          className="timer-fill"
-          style={{
-            animationDuration: `${question.time_limit_s}s, 0.3s`,
-            animationDelay: `0s, ${Math.max(0, question.time_limit_s - 5)}s`,
-            animationPlayState: `${playState}, ${playState}`,
-          }}
-          onAnimationEnd={(e) => {
-            if (e.animationName === 'drain') answer(null)
-          }}
-        />
-      </div>
-
-      <p className="meta">
-        {question.category} · {question.difficulty}
-      </p>
-      <h2 className="prompt">{question.prompt}</h2>
-      {question.code && (
-        <pre className="code">
-          <code>{question.code}</code>
-        </pre>
-      )}
-
-      <div className="options">
-        {question.options.map((option, index) => (
-          <button
-            key={index}
-            className={optionClass(index)}
-            onClick={() => answer(index)}
-            disabled={phase !== 'question'}
-          >
-            <span className="option-key">{index + 1}</span>
-            {option}
-          </button>
-        ))}
-      </div>
+      <QuestionCard
+        question={question}
+        roundKey={current.attempt_id}
+        running={phase === 'question'}
+        picked={picked}
+        correctChoice={answered ? result.correct_choice : null}
+        disabled={phase !== 'question'}
+        onAnswer={answer}
+      />
 
       {answered && (
         <div className="result">

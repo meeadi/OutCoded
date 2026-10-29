@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
 from app.db import create_pool, get_conn
-from app.routers import profiles, solo
+from app.routers import profiles, solo, matches
 
 
 @asynccontextmanager
@@ -33,6 +33,7 @@ app.add_middleware(
 
 app.include_router(profiles.router)
 app.include_router(solo.router)
+app.include_router(matches.router)
 
 
 @app.get("/health", tags=["meta"])

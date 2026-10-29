@@ -27,3 +27,20 @@ def to_displayed_index(original_index: int, order: list[int]) -> int:
 
 def is_timed_out(response_ms: int, time_limit_s: int, grace_ms: int) -> bool:
     return response_ms > time_limit_s * 1000 + grace_ms
+
+
+MATCH_BASE_POINTS = 100
+MATCH_MAX_SPEED_BONUS = 100
+
+
+def match_points(correct: bool, response_ms: int, time_limit_s: int) -> int:
+    """Code-Off scoring: 100 for a right answer, plus up to 100 more for speed.
+
+    The bonus shrinks linearly from 100 (instant) to 0 (at the time limit).
+    Wrong answers and timeouts score nothing.
+    """
+    if not correct:
+        return 0
+    limit_ms = time_limit_s * 1000
+    remaining = max(0.0, 1 - response_ms / limit_ms)
+    return MATCH_BASE_POINTS + round(MATCH_MAX_SPEED_BONUS * remaining)

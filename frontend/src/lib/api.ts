@@ -71,10 +71,16 @@ async function request<T>(method: 'GET' | 'POST' | 'PUT', path: string, body?: u
   return response.json() as Promise<T>
 }
 
+// WebSocket address for a path on the same backend (http -> ws, https -> wss).
+export function wsUrl(path: string): string {
+  return API_URL.replace(/^http/, 'ws') + path
+}
+
 export const api = {
   me: () => request<Profile>('GET', '/me'),
   setUsername: (username: string) => request<Profile>('PUT', '/me/username', { username }),
   nextQuestion: () => request<NextQuestion>('POST', '/solo/next'),
   submitAnswer: (attemptId: string, choice: number | null) =>
     request<AnswerResult>('POST', '/solo/answer', { attempt_id: attemptId, choice }),
+  createMatch: () => request<{code: string} > ('POST', '/matches'),
 }

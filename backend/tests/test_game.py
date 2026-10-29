@@ -32,3 +32,13 @@ def test_choice_out_of_range_is_rejected():
 )
 def test_timeout_includes_grace_period(response_ms, expected):
     assert game.is_timed_out(response_ms, time_limit_s=30, grace_ms=1500) is expected
+
+def test_match_points_reward_speed():
+    assert game.match_points(True, 0, 30) == 200  # instant
+    assert game.match_points(True, 15_000, 30) == 150  # half the time used
+    assert game.match_points(True, 30_000, 30) == 100  # right at the limit
+    assert game.match_points(True, 31_000, 30) == 100  # within grace: no negative bonus
+
+
+def test_match_points_zero_when_wrong():
+    assert game.match_points(False, 1_000, 30) == 0

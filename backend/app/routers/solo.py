@@ -16,6 +16,7 @@ from app.config import get_settings
 from app.db import ensure_profile, get_conn
 from app.events import log_event
 from app.schemas import AnswerRequest, AnswerResponse, NextQuestionResponse, ServedQuestion
+from app.scoring import AlreadyAnswered, AttemptNotFound, InvalidChoice, score_attempt
 
 router = APIRouter(prefix="/solo", tags=["solo"])
 
@@ -93,73 +94,21 @@ async def submit_answer(
     user: CurrentUser = Depends(get_current_user),
     conn: asyncpg.Connection = Depends(get_conn),
 ) -> AnswerResponse:
-    settings = get_settings()
-    async with conn.transaction():
-        # Lock the attempt row so a double-click can't be scored twice.
-        row = await conn.fetchrow(
-            """
-            select a.question_id, a.option_order, a.answered_at,
-                   q.correct_index, q.explanation, q.time_limit_s,
-                   (extract(epoch from clock_timestamp() - a.shown_at) * 1000)::int as elapsed_ms
-            from public.attempts a
-            join public.questions q on q.id = a.question_id
-            where a.id = $1 and a.user_id = $2
-            for update of a
-            """,
-            body.attempt_id,
-            user.id,
+    try:
+        scored = await score_attempt(
+            conn, body.attempt_id, user.id, body.choice, get_settings().answer_grace_ms
         )
-        if row is None:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Attempt not found")
-        if row["answered_at"] is not None:
-            raise HTTPException(status.HTTP_409_CONFLICT, "Already answered")
-
-        order = list(row["option_order"])
-        chosen = None  # stays None when the player ran out of time without picking
-        if body.choice is not None:
-            try:
-                chosen = game.to_original_index(body.choice, order)
-            except ValueError:
-                raise HTTPException(
-                    status.HTTP_422_UNPROCESSABLE_ENTITY, "Choice out of range"
-                ) from None
-
-        response_ms = row["elapsed_ms"]
-        # No choice means the player's timer ran out; otherwise check against server time.
-        timed_out = chosen is None or game.is_timed_out(
-            response_ms, row["time_limit_s"], settings.answer_grace_ms
-        )
-        correct = not timed_out and chosen == row["correct_index"]
-
-        await conn.execute(
-            """
-            update public.attempts
-            set answered_at = clock_timestamp(), chosen_index = $2, is_correct = $3,
-                timed_out = $4, response_ms = $5
-            where id = $1
-            """,
-            body.attempt_id,
-            chosen,
-            correct,
-            timed_out,
-            response_ms,
-        )
-        await log_event(
-            conn,
-            "answer_submitted",
-            user_id=user.id,
-            attempt_id=body.attempt_id,
-            question_id=row["question_id"],
-            mode="solo",
-            correct=correct,
-            timed_out=timed_out,
-            response_ms=response_ms,
-        )
+    except AttemptNotFound:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Attempt not found") from None
+    except AlreadyAnswered:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Already answered") from None
+    except InvalidChoice:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Choice out of range") from None
 
     return AnswerResponse(
-        correct=correct,
-        timed_out=timed_out,
-        correct_choice=game.to_displayed_index(row["correct_index"], order),
-        response_ms=response_ms,
-        explanation=row["explanation"],
+        correct=scored.correct,
+        timed_out=scored.timed_out,
+        correct_choice=scored.correct_choice,
+        response_ms=scored.response_ms,
+        explanation=scored.explanation,
     )
