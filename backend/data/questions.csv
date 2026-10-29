@@ -1,0 +1,61 @@
+slug,format,category,language,difficulty,prompt,code,option_a,option_b,option_c,option_d,correct,explanation,time_limit_s,status
+py-mutable-default,predict_output,python,python,medium,What does this print?,"def add(item, bucket=[]):
+    bucket.append(item)
+    return bucket
+
+add(1)
+print(add(2))",[2],"[1, 2]",[1],TypeError,B,"Default arguments are evaluated once, when the function is defined. Every call without a bucket shares the same list, so the 1 from the first call is still there.",30,active
+py-late-binding,predict_output,python,python,hard,What does this print?,"funcs = [lambda: i for i in range(3)]
+print([f() for f in funcs])",NameError,"[0, 1, 2]","[2, 2, 2]","[3, 3, 3]",C,"Closures look up i when they are called, not when they are created. By then the loop has finished and i is 2. Fix it with lambda i=i: i.",40,active
+py-list-aliasing,predict_output,python,python,medium,What does this print?,"grid = [[0] * 3] * 3
+grid[0][0] = 1
+print(grid)","[[1, 1, 1], [0, 0, 0], [0, 0, 0]]",IndexError,"[[1, 0, 0], [0, 0, 0], [0, 0, 0]]","[[1, 0, 0], [1, 0, 0], [1, 0, 0]]",D,"Multiplying the outer list copies the reference, not the inner list. All three rows are the same list object. Use [[0] * 3 for _ in range(3)] instead.",30,active
+py-slice-step,predict_output,python,python,easy,What does this print?,"s = ""outcode""
+print(s[::-2])",eoto,otoe,uco,edoctuo,A,"A step of -2 walks backwards from the last character, taking every second one: e, o, t, o.",25,active
+py-dict-true-one,predict_output,python,python,hard,What does this print?,"d = {1: ""a"", True: ""b"", 1.0: ""c""}
+print(d)","{1: 'a', True: 'b', 1.0: 'c'}",{1: 'c'},{True: 'c'},{1.0: 'c'},B,"1, True and 1.0 are equal and have the same hash, so they are the same dict key. The first key spelling is kept and the last value wins.",40,active
+py-generator-exhausted,predict_output,python,python,medium,What does this print?,"nums = (x * x for x in range(4))
+print(sum(nums), sum(nums))",TypeError,14 14,14 0,6 6,C,"A generator can only be consumed once. The first sum uses up 0 + 1 + 4 + 9 = 14, so the second sum sees nothing and returns 0.",30,active
+py-chained-comparison,predict_output,python,python,medium,What does this print?,"print(5 > 4 > 3, (5 > 4) > 3)",False False,False True,True True,True False,D,"5 > 4 > 3 is chained: it means 5 > 4 and 4 > 3. With brackets, 5 > 4 becomes True, which equals 1, and 1 > 3 is False.",30,active
+py-tuple-plus-equals,predict_output,python,python,hard,What does this print?,"t = ([1],)
+try:
+    t[0] += [2]
+except TypeError:
+    print(""error"", end="" "")
+print(t)","error ([1],)","error ([1, 2],)","([1, 2],)","([1],)",B,"+= first extends the list in place (that works), then tries to assign the result back into the tuple (that fails). So you get the error AND the changed list.",45,active
+py-remove-while-iterating,predict_output,python,python,medium,What does this print?,"nums = [1, 2, 2, 3]
+for n in nums:
+    if n == 2:
+        nums.remove(n)
+print(nums)","[1, 3]","[1, 2, 3]","[1, 2, 2, 3]",RuntimeError,B,"Removing an item shifts the rest left, so the loop skips the element right after it. The second 2 is never checked. Build a new list instead of removing in place.",35,active
+js-default-sort,predict_output,javascript,javascript,medium,What does this log?,"console.log([1, 10, 2].sort().join("",""));","2,1,10","1,2,10","1,10,2","10,2,1",C,"Without a compare function, sort() compares values as strings, and ""10"" comes before ""2"". Use sort((a, b) => a - b) for numbers.",30,active
+js-float-sum,predict_output,javascript,javascript,easy,What does this log?,console.log(0.1 + 0.2 === 0.3);,undefined,NaN,true,false,D,0.1 and 0.2 can't be stored exactly in binary floating point. Their sum is 0.30000000000000004. Compare with a small tolerance instead.,20,active
+js-string-math,predict_output,javascript,javascript,easy,What does this log?,"console.log(""5"" - 2, ""5"" + 2);",3 52,52 52,NaN 52,3 7,A,"Minus only works on numbers, so ""5"" is converted to 5. Plus with a string means concatenation, so 2 becomes ""2"".",25,active
+js-typeof-null,predict_output,javascript,javascript,easy,What does this log?,console.log(typeof null);,null,object,undefined,number,B,"A famous bug from JavaScript's first version that can never be fixed without breaking the web. To check for null, use value === null.",20,active
+sql-null-not-equal,predict_output,sql,sql,medium,"Table t has a column x with three rows: 1, 2 and NULL. What does this query return?",SELECT COUNT(*) FROM t WHERE x <> 1;,0,1,2,3,B,"NULL <> 1 is not true, it's unknown, and WHERE keeps only rows where the condition is true. Only the row with 2 counts. Use x IS DISTINCT FROM 1 to include NULLs.",35,active
+sql-count-star-vs-column,predict_output,sql,sql,easy,"Table t has a column x with three rows: NULL, NULL and 3. What does this query return?","SELECT COUNT(*), COUNT(x) FROM t;","1, 1","3, 0","3, 3","3, 1",D,COUNT(*) counts rows. COUNT(x) counts only rows where x is not NULL.,25,active
+sql-left-join-where,spot_bug,sql,sql,hard,"This should list every customer with their 2026 orders, including customers with no orders. Customers without orders are missing. Why?","SELECT c.name, o.id
+FROM customers c
+LEFT JOIN orders o ON o.customer_id = c.id
+WHERE o.created_at >= '2026-01-01';","The WHERE filter removes rows where o.created_at is NULL, turning it into an inner join",The date needs to be cast to a timestamp,SELECT must include c.id for the join to work,LEFT JOIN should be RIGHT JOIN,A,"Customers without orders get NULLs for every o column, and NULL >= '2026-01-01' is not true, so WHERE drops them. Move the date condition into the ON clause.",45,active
+py-empty-average,spot_bug,python,python,easy,What's wrong with this function?,"def average(nums):
+    total = 0
+    for n in nums:
+        total += n
+    return total / len(nums)",total should start at 1,It crashes with ZeroDivisionError when nums is empty,The loop skips the last element,"Nothing, it's correct",B,"len([]) is 0, so an empty list divides by zero. Decide what an empty average should be (None, 0, or an error with a clear message) and handle it first.",30,active
+sec-sql-injection,spot_bug,security,python,easy,What's the security problem here?,"def get_user(cursor, username):
+    query = f""SELECT * FROM users WHERE name = '{username}'""
+    cursor.execute(query)
+    return cursor.fetchone()",The cursor is never closed,fetchone() should be fetchall(),SQL injection: user input is pasted straight into the query,The query is missing a LIMIT,C,"A username like ' OR '1'='1 changes the query itself. Pass values as parameters instead: cursor.execute(""... WHERE name = %s"", (username,)).",30,active
+js-assignment-in-if,spot_bug,javascript,javascript,medium,Every user gets admin access. Why?,"function canDelete(user) {
+  if (user.role = ""admin"") {
+    return true;
+  }
+  return false;
+}",return false is unreachable,"user.role should be user[""role""]",The function should be async,"= assigns ""admin"" instead of comparing, and a non-empty string is truthy",D,"A single = is assignment. It sets every user's role to ""admin"" and the condition is always truthy. Use === to compare.",35,active
+qf-dict-lookup,quickfire,complexity,,easy,What's the average time complexity of looking up a key in a Python dict?,,O(log n),O(n),O(n log n),O(1),D,Dicts are hash tables: the key's hash points almost directly to its slot.,15,active
+qf-binary-search-steps,quickfire,complexity,,medium,"Binary search over a sorted array of 1,000,000 items needs at most about how many comparisons?",,20,"1,000","500,000","1,000,000",A,"Each step halves the search space, and 2^20 is about 1,000,000, so about 20 steps.",20,active
+qf-git-revert,quickfire,git,,medium,"Which command undoes a pushed commit by adding a new commit, without rewriting history?",,git stash,git reset --hard,git revert,git checkout,C,"git revert creates a new commit that reverses the changes, so it's safe on shared branches. git reset rewrites history and causes trouble for anyone who already pulled.",20,active
+qf-http-401-403,quickfire,web,,medium,An API returns 403 Forbidden. What does that usually mean?,,The endpoint doesn't exist,The server crashed,You're not logged in,"The server knows who you are, but you aren't allowed to do this",D,"401 means the server doesn't know who you are (missing or bad credentials). 403 means it does know, and the answer is still no.",20,active
+qf-regex-count,quickfire,regex,,medium,"How many of these strings fully match the regex ^\d{3}-\d{2}$ ?
+123-45   12-345   123-456   000-00   12a-45",,2,3,4,1,A,"It needs exactly three digits, a dash, then exactly two digits. Only 123-45 and 000-00 fit.",25,active
