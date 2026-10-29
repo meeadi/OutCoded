@@ -1,5 +1,5 @@
 -- =====================================================================
--- OutCode: initial schema
+-- OutCoded: initial schema
 -- Run this once in the Supabase dashboard: SQL Editor -> New query ->
 -- paste this file -> Run.
 --

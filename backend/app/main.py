@@ -17,7 +17,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="OutCode API",
+    title="OutCoded API",
     version="0.1.0",
     description="Competitive coding puzzles. The server is the referee.",
     lifespan=lifespan,

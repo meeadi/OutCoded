@@ -1,4 +1,4 @@
-# OutCode
+# OutCoded
 
 Chess.com for coding puzzles: quick, rated rounds of *predict the output*, *spot the bug* and quickfire questions.
 

@@ -1,0 +1,208 @@
+/* ---------- Themes: each one is just a set of color variables ---------- */
+:root,
+[data-theme="midnight"] {
+  --bg: #14151a;
+  --surface: #1c1e25;
+  --text: #e6e6e6;
+  --sub: #6b6f7b;
+  --accent: #7c5cff;
+  --correct: #4ade80;
+  --wrong: #f87171;
+}
+
+[data-theme="paper"] {
+  --bg: #f4f1ea;
+  --surface: #e9e4d8;
+  --text: #2b2a27;
+  --sub: #8c877c;
+  --accent: #d9480f;
+  --correct: #2f9e44;
+  --wrong: #e03131;
+}
+
+[data-theme="matcha"] {
+  --bg: #1d2420;
+  --surface: #26302a;
+  --text: #dfe8d8;
+  --sub: #7d8f7f;
+  --accent: #a3c76d;
+  --correct: #a3c76d;
+  --wrong: #e5806b;
+}
+
+/* ---------- Base ---------- */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  transition: background 0.3s ease, color 0.3s ease;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--bg);
+}
+
+/* ---------- Layout ---------- */
+.app {
+  min-height: 100%;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 32px 24px;
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.logo {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.logo span {
+  color: var(--accent);
+}
+
+.themes {
+  display: flex;
+  gap: 10px;
+}
+
+.theme-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  transition: transform 0.15s ease;
+}
+
+.theme-dot:hover {
+  transform: scale(1.25);
+}
+
+.theme-dot.active {
+  border-color: var(--text);
+}
+
+.main {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  text-align: center;
+}
+
+.tagline {
+  color: var(--sub);
+}
+
+/* ---------- Auth ---------- */
+.auth {
+  width: 100%;
+  max-width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.auth-title {
+  font-size: 1.1rem;
+  color: var(--sub);
+  margin-bottom: 8px;
+}
+
+.auth input {
+  font: inherit;
+  color: var(--text);
+  background: var(--surface);
+  border: 2px solid transparent;
+  border-radius: 8px;
+  padding: 10px 14px;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.auth input:focus {
+  border-color: var(--accent);
+}
+
+.auth input::placeholder {
+  color: var(--sub);
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: var(--bg);
+  font-weight: 700;
+  border-radius: 8px;
+  padding: 10px 14px;
+  transition: transform 0.1s ease, opacity 0.15s ease;
+}
+
+.btn-primary:hover {
+  transform: translateY(-1px);
+}
+
+.btn-primary:active {
+  transform: translateY(1px);
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+
+.auth-message {
+  font-size: 0.85rem;
+  color: var(--wrong);
+}
+
+.auth-switch,
+.link {
+  color: var(--sub);
+  font-size: 0.85rem;
+  transition: color 0.15s ease;
+}
+
+.auth-switch:hover,
+.link:hover {
+  color: var(--accent);
+}
+
+.home {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.signed-in {
+  color: var(--sub);
+  font-size: 0.85rem;
+}
