@@ -1,9 +1,14 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, type AnswerResult, type NextQuestion } from '../lib/api'
+import { celebrate, punish } from '../lib/effects'
 
 type Phase = 'loading' | 'question' | 'submitting' | 'result' | 'error'
 
-export default function PuzzleRush() {
+type Props = {
+  effects: boolean
+}
+
+export default function PuzzleRush({ effects }: Props) {
   const [phase, setPhase] = useState<Phase>('loading')
   const [current, setCurrent] = useState<NextQuestion | null>(null)
   const [picked, setPicked] = useState<number | null>(null)
@@ -36,18 +41,23 @@ export default function PuzzleRush() {
       setPhase('submitting')
       try {
         const res = await api.submitAnswer(current.attempt_id, choice)
+        const streak = res.correct ? stats.streak + 1 : 0
         setResult(res)
         setStats((s) => ({
           correct: s.correct + (res.correct ? 1 : 0),
           total: s.total + 1,
-          streak: res.correct ? s.streak + 1 : 0,
+          streak,
         }))
         setPhase('result')
+        if (effects) {
+          if (res.correct) celebrate(streak)
+          else punish()
+        }
       } catch (e) {
         showError(e)
       }
     },
-    [phase, current, showError],
+    [phase, current, stats.streak, effects, showError],
   )
 
   // Load the first question when the component appears.
@@ -95,6 +105,15 @@ export default function PuzzleRush() {
   const { question } = current
   const answered = phase === 'result' && result
 
+  // Bonus stamps: answered in the last 3 seconds, or right in under 2.5 seconds.
+  const remainingMs = question.time_limit_s * 1000 - (result?.response_ms ?? 0)
+  let stamp: string | null = null
+  if (answered && result.correct) {
+    if (remainingMs < 3000) stamp = 'clutch!'
+    else if (result.response_ms < 2500) stamp = 'too easy'
+  }
+  const playState = phase === 'question' ? 'running' : 'paused'
+
   function optionClass(index: number) {
     if (!answered) return 'option'
     if (index === result!.correct_choice) return 'option correct'
@@ -108,19 +127,32 @@ export default function PuzzleRush() {
         <span>
           {stats.correct}/{stats.total}
         </span>
-        <span className={stats.streak >= 3 ? 'streak hot' : 'streak'}>streak {stats.streak}</span>
+        <span className={stats.streak >= 3 ? 'streak hot' : 'streak'}>
+          streak {stats.streak}
+          {stats.streak >= 5 && ' 🔥'}
+        </span>
       </div>
 
-      {/* The key restarts the animation for every new question. */}
-      <div className="timer">
+      {/* The key restarts the animations for every new question.
+          In the last 5 seconds the bar turns red and starts to glow. */}
+      <div
+        key={current.attempt_id}
+        className="timer"
+        style={{
+          animationDelay: `${Math.max(0, question.time_limit_s - 5)}s`,
+          animationPlayState: playState,
+        }}
+      >
         <div
-          key={current.attempt_id}
           className="timer-fill"
           style={{
-            animationDuration: `${question.time_limit_s}s`,
-            animationPlayState: phase === 'question' ? 'running' : 'paused',
+            animationDuration: `${question.time_limit_s}s, 0.3s`,
+            animationDelay: `0s, ${Math.max(0, question.time_limit_s - 5)}s`,
+            animationPlayState: `${playState}, ${playState}`,
           }}
-          onAnimationEnd={() => answer(null)}
+          onAnimationEnd={(e) => {
+            if (e.animationName === 'drain') answer(null)
+          }}
         />
       </div>
 
@@ -153,6 +185,7 @@ export default function PuzzleRush() {
           <p className={result.correct ? 'verdict good' : 'verdict bad'}>
             {result.correct ? 'correct!' : result.timed_out ? "time's up" : 'nope'}
             <span className="time"> {(result.response_ms / 1000).toFixed(1)}s</span>
+            {stamp && <span className="stamp">{stamp}</span>}
           </p>
           <p className="explanation">{result.explanation}</p>
           <button className="link" onClick={loadNext}>

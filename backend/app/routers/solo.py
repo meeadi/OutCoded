@@ -125,7 +125,10 @@ async def submit_answer(
                 ) from None
 
         response_ms = row["elapsed_ms"]
-        timed_out = game.is_timed_out(response_ms, row["time_limit_s"], settings.answer_grace_ms)
+        # No choice means the player's timer ran out; otherwise check against server time.
+        timed_out = chosen is None or game.is_timed_out(
+            response_ms, row["time_limit_s"], settings.answer_grace_ms
+        )
         correct = not timed_out and chosen == row["correct_index"]
 
         await conn.execute(
