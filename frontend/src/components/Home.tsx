@@ -2,7 +2,9 @@ import { useCallback, useEffect, useState } from 'react'
 import { api, type Profile } from '../lib/api'
 import { supabase } from '../lib/supabase'
 import CodeOff from './CodeOff'
+import Leaderboard from './Leaderboard'
 import Menu from './Menu'
+import PlayerPage from './PlayerPage'
 import PuzzleRush from './PuzzleRush'
 import Queue from './Queue'
 import UsernamePicker from './UsernamePicker'
@@ -16,6 +18,8 @@ type Mode =
   | { kind: 'solo' }
   | { kind: 'queue' }
   | { kind: 'codeoff'; code: string }
+  | { kind: 'leaderboard' }
+  | { kind: 'player'; username: string }
 
 // An invite link looks like ...?match=abc123
 function initialMode(): Mode {
@@ -51,7 +55,10 @@ export default function Home({ effects }: Props) {
   const goToMenu = useCallback(() => {
     setMatchInUrl(null)
     setMode({ kind: 'menu' })
-    api.me().then(setProfile).catch(() => {}) // pick up a new rating after a ranked match
+    api
+      .me()
+      .then(setProfile)
+      .catch(() => {}) // pick up a new rating after a ranked match
   }, [])
 
   // Stable on purpose: the queue reconnects if this function changes.
@@ -63,6 +70,11 @@ export default function Home({ effects }: Props) {
   const findRanked = useCallback(() => {
     setMatchInUrl(null)
     setMode({ kind: 'queue' })
+  }, [])
+
+  const openPlayer = useCallback((username: string) => {
+    setMatchInUrl(null)
+    setMode({ kind: 'player', username })
   }, [])
 
   async function startFriendMatch() {
@@ -93,6 +105,7 @@ export default function Home({ effects }: Props) {
             onSolo={() => setMode({ kind: 'solo' })}
             onRanked={findRanked}
             onFriend={startFriendMatch}
+            onLeaderboard={() => setMode({ kind: 'leaderboard' })}
             busy={creating}
           />
           {error && <p className="auth-message">{error}</p>}
@@ -100,6 +113,13 @@ export default function Home({ effects }: Props) {
       )}
       {mode.kind === 'solo' && <PuzzleRush effects={effects} />}
       {mode.kind === 'queue' && <Queue onMatched={joinMatch} onCancel={goToMenu} />}
+      {mode.kind === 'leaderboard' && (
+        <Leaderboard me={profile.username} onOpenPlayer={openPlayer} />
+      )}
+      {mode.kind === 'player' && (
+        // The key reloads the page when you jump from one player to another.
+        <PlayerPage key={mode.username} username={mode.username} onOpenPlayer={openPlayer} />
+      )}
       {mode.kind === 'codeoff' && (
         <CodeOff
           // A new key for every match means a fresh connection and fresh state.
@@ -120,7 +140,11 @@ export default function Home({ effects }: Props) {
             ·{' '}
           </>
         )}
-        playing as <span className="you">{profile.username}</span> ·{' '}
+        playing as{' '}
+        <button className="link you" onClick={() => openPlayer(profile.username!)}>
+          {profile.username}
+        </button>{' '}
+        ·{' '}
         <button className="link" onClick={() => supabase.auth.signOut()}>
           sign out
         </button>

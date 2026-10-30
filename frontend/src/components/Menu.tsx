@@ -7,21 +7,31 @@ type Props = {
   onSolo: () => void
   onRanked: () => void
   onFriend: () => void
+  onLeaderboard: () => void
   busy: boolean
 }
 
-export default function Menu({ rating, rd, onSolo, onRanked, onFriend, busy }: Props) {
-  // Keyboard: 1 solo, 2 ranked, 3 friend.
+export default function Menu({
+  rating,
+  rd,
+  onSolo,
+  onRanked,
+  onFriend,
+  onLeaderboard,
+  busy,
+}: Props) {
+  // Keyboard: 1 solo, 2 ranked, 3 friend, 4 leaderboard.
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
       if (busy) return
       if (event.key === '1') onSolo()
       if (event.key === '2') onRanked()
       if (event.key === '3') onFriend()
+      if (event.key === '4') onLeaderboard()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onSolo, onRanked, onFriend, busy])
+  }, [onSolo, onRanked, onFriend, onLeaderboard, busy])
 
   return (
     <div className="menu">
@@ -41,6 +51,11 @@ export default function Menu({ rating, rd, onSolo, onRanked, onFriend, busy }: P
         <span className="option-key">3</span>
         <span className="mode-name">code-off a friend</span>
         <span className="mode-desc">send a link. 5 rounds. no rating, just bragging rights.</span>
+      </button>
+      <button className="mode small" onClick={onLeaderboard} disabled={busy}>
+        <span className="option-key">4</span>
+        <span className="mode-name">leaderboard</span>
+        <span className="mode-desc">who's actually cracked.</span>
       </button>
     </div>
   )

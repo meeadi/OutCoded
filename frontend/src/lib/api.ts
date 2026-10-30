@@ -34,6 +34,43 @@ export type Profile = {
   created_at: string
 }
 
+export type WinLossRecord = { games: number; wins: number; losses: number; draws: number }
+
+export type LeaderboardRow = {
+  rank: number
+  username: string
+  rating: number
+  rating_deviation: number
+  record: WinLossRecord
+}
+
+export type Leaderboard = {
+  placement_matches: number
+  players: LeaderboardRow[]
+  you: LeaderboardRow | null
+  your_games: number
+}
+
+export type PlayerProfile = {
+  username: string
+  rating: number
+  rating_deviation: number
+  joined: string
+  rank: number | null
+  placement_matches: number
+  record: WinLossRecord
+  history: { at: string; rating: number }[]
+  recent: {
+    at: string
+    opponent: string | null
+    result: 'win' | 'loss' | 'draw'
+    change: number
+    score_you: number
+    score_opponent: number
+    forfeit: boolean
+  }[]
+}
+
 // An error from our backend, carrying its HTTP status and readable message.
 export class ApiError extends Error {
   status: number
@@ -83,4 +120,7 @@ export const api = {
   submitAnswer: (attemptId: string, choice: number | null) =>
     request<AnswerResult>('POST', '/solo/answer', { attempt_id: attemptId, choice }),
   createMatch: () => request<{code: string} > ('POST', '/matches'),
+  leaderboard: () => request<Leaderboard>('GET', '/leaderboard'),
+  player: (username: string) =>
+    request<PlayerProfile>('GET', `/players/${encodeURIComponent(username)}`),
 }
