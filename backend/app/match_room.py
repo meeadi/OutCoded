@@ -11,7 +11,7 @@ Protocol (all messages are JSON with a "type"):
     {"type": "answer", "choice": 0-3 | null}   null = my timer ran out
 
   server -> browser
-    waiting            you're in, waiting for an opponent
+    waiting            you're in, waiting for an opponent (says whether it's ranked)
     start              both players are here; first round in a few seconds
     round              a question (options shuffled per player, no answer)
     opponent_answered  your opponent locked in (but not what they picked)
@@ -38,7 +38,8 @@ logger = logging.getLogger("outcoded.match")
 ROUNDS = 5
 START_DELAY_S = 3
 BETWEEN_ROUNDS_S = 5
-FINAL_PAUSE_S = 5
+FINAL_PAUSE_S = 3  # time to see the last round's result before the winner is announced
+NO_SHOW_S = 20  # a ranked match is cancelled if the opponent hasn't connected by then
 
 
 class RoomError(Exception):
@@ -56,10 +57,20 @@ class Player:
 
 
 class MatchRoom:
-    def __init__(self, match_id: UUID, code: str, host_id: UUID, rated: bool, pool: asyncpg.Pool, grace_ms: int):
+    def __init__(
+        self,
+        match_id: UUID,
+        code: str,
+        host_id: UUID,
+        guest_id: UUID | None,
+        rated: bool,
+        pool: asyncpg.Pool,
+        grace_ms: int,
+    ):
         self.match_id = match_id
         self.code = code
         self.host_id = host_id
+        self.guest_id = guest_id  # ranked matches know both players up front
         self.rated = rated
         self.pool = pool
         self.grace_ms = grace_ms
@@ -67,6 +78,7 @@ class MatchRoom:
         self.lock = asyncio.Lock()
         self.round_done = asyncio.Event()
         self.task: asyncio.Task | None = None
+        self.no_show_task: asyncio.Task | None = None
         self.finished = False
 
     @property
@@ -78,6 +90,8 @@ class MatchRoom:
         async with self.lock:
             if self.finished:
                 raise RoomError("This match is already over.")
+            if self.rated and user_id not in (self.host_id, self.guest_id):
+                raise RoomError("This is a ranked match between two other players.")
 
             async with self.pool.acquire() as conn:
                 username = await conn.fetchval(
@@ -98,10 +112,14 @@ class MatchRoom:
             else:
                 self.players[user_id] = Player(id=user_id, username=username, socket=socket)
 
-            await _send(socket, {"type": "waiting", "you": username})
+            await _send(socket, {"type": "waiting", "you": username, "rated": self.rated})
 
             if len(self.players) == 2 and not self.started:
+                if self.no_show_task:
+                    self.no_show_task.cancel()
                 self.task = asyncio.create_task(self._run())
+            elif self.rated and self.no_show_task is None:
+                self.no_show_task = asyncio.create_task(self._cancel_if_no_show())
 
     async def leave(self, user_id: UUID, socket: WebSocket) -> None:
         async with self.lock:
@@ -118,6 +136,13 @@ class MatchRoom:
         if self.task and self.task is not asyncio.current_task():
             self.task.cancel()
         await self._finish(forfeited_by=user_id)
+
+    async def _cancel_if_no_show(self) -> None:
+        """Ranked: if the matched opponent never connects, call the match off."""
+        await asyncio.sleep(NO_SHOW_S)
+        if self.started or self.finished:
+            return
+        await self._abandon("Your opponent didn't show up. Match cancelled, no rating change.")
 
     # ------------------------------------------------------------------ answers
     async def handle_answer(self, user_id: UUID, choice: object) -> None:
@@ -188,7 +213,7 @@ class MatchRoom:
             raise
         except Exception:
             logger.exception("Match %s crashed", self.code)
-            await self._abandon()
+            await self._abandon("Something broke on our side. Match cancelled.")
 
     async def _play_round(self, number: int, used: list[UUID]) -> None:
         async with self.pool.acquire() as conn:
@@ -355,20 +380,23 @@ class MatchRoom:
                     "opponent": opponent.username if opponent else None,
                     "score": {"you": player.score, "opponent": opponent.score if opponent else 0},
                     "rated": self.rated,
-                    "rating": rating_changes.get(player.id),
+                    "rating": rating_changes.get(player.id),  # None in casual matches
                 },
             )
         registry.forget(self.code)
 
-    async def _abandon(self) -> None:
-        self.finished = True
+    async def _abandon(self, message: str) -> None:
+        async with self.lock:
+            if self.finished:
+                return
+            self.finished = True
         async with self.pool.acquire() as conn:
             await conn.execute(
                 "update public.matches set status = 'abandoned', finished_at = now() where id = $1",
                 self.match_id,
             )
         for player in self.players.values():
-            await _send(player.socket, {"type": "error", "message": "Something broke. Match cancelled."})
+            await _send(player.socket, {"type": "error", "message": message})
         registry.forget(self.code)
 
     def _opponent(self, player: Player) -> Player | None:
@@ -414,13 +442,16 @@ class RoomRegistry:
                 async with pool.acquire() as conn:
                     match = await conn.fetchrow(
                         """
-                        select id, host_id, rated from public.matches where code = $1 and status = 'waiting'
+                        select id, host_id, guest_id, rated from public.matches
+                        where code = $1 and status = 'waiting'
                         """,
                         code,
                     )
                 if match is None:
                     return None
-                room = MatchRoom(match["id"], code, match["host_id"], match["rated"], pool, grace_ms)
+                room = MatchRoom(
+                    match["id"], code, match["host_id"], match["guest_id"], match["rated"], pool, grace_ms
+                )
                 self.rooms[code] = room
             return room
 

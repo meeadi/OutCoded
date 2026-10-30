@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, type AnswerResult, type NextQuestion } from '../lib/api'
-import { celebrate, punish } from '../lib/effects'
-import { currentStreak, SESSION_LENGTH, type Round } from '../lib/session'
+import { celebrate, punish, sparkle, victory } from '../lib/effects'
+import { currentStreak, SESSION_LENGTH, stampFor, type Round } from '../lib/session'
 import QuestionCard from './QuestionCard'
 import Results from './Results'
 
@@ -45,7 +45,7 @@ export default function PuzzleRush({ effects }: Props) {
     setPhase('summary')
     const correct = rounds.filter((r) => r.correct).length
     if (effects) {
-      if (correct >= 8) celebrate(10) // big burst
+      if (correct >= 8) victory() // big burst
       else if (correct <= 3) punish()
     }
   }, [rounds, effects, loadNext])
@@ -69,8 +69,9 @@ export default function PuzzleRush({ effects }: Props) {
         setRounds((previous) => [...previous, round])
         setPhase('result')
         if (effects) {
-          if (res.correct) celebrate(streak)
-          else punish()
+          if (!res.correct) punish()
+          else if (streak >= 3) celebrate(streak)
+          else sparkle()
         }
       } catch (e) {
         showError(e)
@@ -129,12 +130,9 @@ export default function PuzzleRush({ effects }: Props) {
   const answered = phase === 'result' && result
 
   // Bonus stamps: answered in the last 3 seconds, or right in under 2.5 seconds.
-  const remainingMs = question.time_limit_s * 1000 - (result?.response_ms ?? 0)
-  let stamp: string | null = null
-  if (answered && result.correct) {
-    if (remainingMs < 3000) stamp = 'clutch!'
-    else if (result.response_ms < 2500) stamp = 'too easy'
-  }
+  const stamp = answered
+    ? stampFor(result.correct, result.response_ms, question.time_limit_s)
+    : null
   const streak = currentStreak(rounds)
   const isLast = rounds.length >= SESSION_LENGTH
 

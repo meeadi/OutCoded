@@ -34,3 +34,11 @@ export function rankFor(correct: number, total: number): { letter: string; line:
   if (score >= 0.2) return { letter: 'D', line: 'you got outcoded.' }
   return { letter: 'F', line: 'did you read the questions or just vibe?' }
 }
+
+// Bonus stamp for a right answer: in the last 3 seconds, or in under 2.5 seconds.
+export function stampFor(correct: boolean, responseMs: number, timeLimitS: number): string | null {
+  if (!correct) return null
+  if (timeLimitS * 1000 - responseMs < 3000) return 'clutch!'
+  if (responseMs < 2500) return 'too easy'
+  return null
+}

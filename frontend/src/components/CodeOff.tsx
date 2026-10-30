@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { wsUrl, type Question } from '../lib/api'
-import { celebrate, punish } from '../lib/effects'
+import { celebrate, punish, sparkle, victory } from '../lib/effects'
+import { stampFor } from '../lib/session'
 import { supabase } from '../lib/supabase'
+import MatchSummary, { type RoundSummary } from './MatchSummary'
 import QuestionCard from './QuestionCard'
 
 // ---- Messages the match server sends (see backend/app/match_room.py) ----
@@ -19,15 +21,18 @@ type ResultMessage = {
   score: Score
   next_in: number
 }
+type RatingChange = { before: number; after: number; change: number }
 type OverMessage = {
   type: 'match_over'
   result: 'win' | 'loss' | 'draw'
   forfeit: boolean
   opponent: string | null
   score: Score
+  rated: boolean
+  rating: RatingChange | null // only in ranked matches
 }
 type ServerMessage =
-  | { type: 'waiting'; you: string }
+  | { type: 'waiting'; you: string; rated: boolean }
   | { type: 'start'; opponent: string; rounds: number; starts_in: number }
   | RoundMessage
   | { type: 'opponent_answered' }
@@ -41,11 +46,12 @@ type Props = {
   code: string
   effects: boolean
   onExit: () => void
-  onNewMatch: () => void
+  onNewMatch: (rated: boolean) => void
 }
 
 export default function CodeOff({ code, effects, onExit, onNewMatch }: Props) {
   const [status, setStatus] = useState<Status>('connecting')
+  const [rated, setRated] = useState(false)
   const [opponent, setOpponent] = useState('')
   const [round, setRound] = useState<RoundMessage | null>(null)
   const [picked, setPicked] = useState<number | null>(null)
@@ -56,6 +62,8 @@ export default function CodeOff({ code, effects, onExit, onNewMatch }: Props) {
   const [over, setOver] = useState<OverMessage | null>(null)
   const [error, setError] = useState('')
   const [countdown, setCountdown] = useState(0)
+  const [history, setHistory] = useState<RoundSummary[]>([])
+  const [streakShown, setStreakShown] = useState(0)
 
   const socket = useRef<WebSocket | null>(null)
   const streak = useRef(0)
@@ -80,6 +88,7 @@ export default function CodeOff({ code, effects, onExit, onNewMatch }: Props) {
       const message = JSON.parse(event.data) as ServerMessage
       switch (message.type) {
         case 'waiting':
+          setRated(message.rated)
           setStatus('waiting')
           break
         case 'start':
@@ -101,12 +110,18 @@ export default function CodeOff({ code, effects, onExit, onNewMatch }: Props) {
         case 'round_result':
           setResult(message)
           setScore(message.score)
+          setHistory((h) => [
+            ...h,
+            { round: message.round, you: message.you, opponent: message.opponent },
+          ])
           setCountdown(message.next_in)
           setStatus('result')
           streak.current = message.you?.correct ? streak.current + 1 : 0
+          setStreakShown(streak.current)
           if (effectsRef.current) {
-            if (message.you?.correct) celebrate(streak.current)
-            else punish()
+            if (!message.you?.correct) punish()
+            else if (streak.current >= 3) celebrate(streak.current)
+            else sparkle()
           }
           break
         case 'match_over':
@@ -115,7 +130,7 @@ export default function CodeOff({ code, effects, onExit, onNewMatch }: Props) {
           setScore(message.score)
           setStatus('over')
           if (effectsRef.current) {
-            if (message.result === 'win') celebrate(10)
+            if (message.result === 'win') victory()
             else if (message.result === 'loss') punish()
           }
           break
@@ -183,7 +198,10 @@ export default function CodeOff({ code, effects, onExit, onNewMatch }: Props) {
     )
   }
 
-  if (status === 'waiting') return <Lobby code={code} onExit={onExit} />
+  if (status === 'waiting') {
+    if (rated) return <p className="tagline">waiting for your opponent to connect...</p>
+    return <Lobby code={code} onExit={onExit} />
+  }
 
   if (status === 'starting') {
     return (
@@ -200,21 +218,36 @@ export default function CodeOff({ code, effects, onExit, onNewMatch }: Props) {
   }
 
   if (status === 'over' && over) {
-    return <MatchOver over={over} onExit={onExit} onNewMatch={onNewMatch} />
+    return (
+      <MatchOver
+        over={over}
+        history={history}
+        effects={effects}
+        onExit={onExit}
+        onNewMatch={onNewMatch}
+      />
+    )
   }
 
   if (!round) return null
   const revealed = status === 'result' && result
+  const stamp =
+    revealed && result.you
+      ? stampFor(result.you.correct, result.you.response_ms, round.question.time_limit_s)
+      : null
 
   return (
     <div className="rush">
       <div className="scoreboard">
         <div className="side">
-          <span className="side-name">you</span>
+          <span className="side-name">
+            you
+            {streakShown >= 3 && <span className="hot-streak">🔥 {streakShown} in a row</span>}
+          </span>
           <span className="side-score">{score.you}</span>
         </div>
         <span className="round-label">
-          round {round.round}/{round.of}
+          {rated && 'ranked · '}round {round.round}/{round.of}
         </span>
         <div className="side right">
           <span className="side-score">{score.opponent}</span>
@@ -248,6 +281,7 @@ export default function CodeOff({ code, effects, onExit, onNewMatch }: Props) {
           <p className={result.you?.correct ? 'verdict good' : 'verdict bad'}>
             {result.you?.correct ? 'correct!' : result.you?.timed_out ? "time's up" : 'nope'}
             <span className="points"> +{result.you?.points ?? 0}</span>
+            {stamp && <span className="stamp">{stamp}</span>}
           </p>
           <p className="opp-line">
             {opponent}: {describe(result.opponent)}
@@ -309,12 +343,16 @@ function Lobby({ code, onExit }: { code: string; onExit: () => void }) {
 
 function MatchOver({
   over,
+  history,
+  effects,
   onExit,
   onNewMatch,
 }: {
   over: OverMessage
+  history: RoundSummary[]
+  effects: boolean
   onExit: () => void
-  onNewMatch: () => void
+  onNewMatch: (rated: boolean) => void
 }) {
   const name = over.opponent ?? 'your opponent'
   const title =
@@ -338,12 +376,51 @@ function MatchOver({
       <p className="final-score">
         {over.score.you} <span className="dash">—</span> {over.score.opponent}
       </p>
-      <button className="btn-primary" onClick={onNewMatch}>
-        new code-off
+      {over.rating && <RatingTicker change={over.rating} animate={effects} />}
+      <MatchSummary rounds={history} opponent={name} />
+      <button className="btn-primary" onClick={() => onNewMatch(over.rated)}>
+        {over.rated ? 'find another match' : 'new code-off'}
       </button>
       <button className="link" onClick={onExit}>
         ← menu
       </button>
     </div>
+  )
+}
+
+// The new rating counts up (or down) from the old one, like a slot machine.
+function RatingTicker({ change, animate }: { change: RatingChange; animate: boolean }) {
+  const [shown, setShown] = useState(animate ? change.before : change.after)
+
+  useEffect(() => {
+    if (!animate) return
+    let frame = 0
+    const delay = setTimeout(() => {
+      const start = performance.now()
+      const duration = 1200
+      const tick = (now: number) => {
+        const t = Math.min(1, (now - start) / duration)
+        const eased = 1 - (1 - t) ** 3 // fast at first, settling at the end
+        setShown(Math.round(change.before + (change.after - change.before) * eased))
+        if (t < 1) frame = requestAnimationFrame(tick)
+      }
+      frame = requestAnimationFrame(tick)
+    }, 600) // let the title land first
+    return () => {
+      clearTimeout(delay)
+      cancelAnimationFrame(frame)
+    }
+  }, [change, animate])
+
+  const up = change.change >= 0
+  return (
+    <p className="rating-ticker">
+      <span className="rating-label">rating</span>
+      <span className="rating-now">{shown}</span>
+      <span className={up ? 'rating-delta up' : 'rating-delta down'}>
+        {up ? '+' : ''}
+        {change.change}
+      </span>
+    </p>
   )
 }

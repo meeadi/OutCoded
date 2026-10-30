@@ -581,27 +581,32 @@ html[data-fx="off"] .timer {
   z-index: 2; /* lift the hovered bar (and its label) above its neighbours */
 }
 
-/* Little label that pops up above a bar on hover. */
+/* Little label that pops up above a bar on hover.
+   Hidden with display: none (not just transparent) so labels near the edge
+   can't make the page scroll sideways on phones. */
 .bar-tip {
+  display: none;
   position: absolute;
   bottom: calc(100% + 6px);
   left: 50%;
-  transform: translateX(-50%) translateY(4px);
+  transform: translateX(-50%);
   background: var(--text);
   color: var(--bg);
   font-size: 0.7rem;
   padding: 2px 6px;
   border-radius: 4px;
   white-space: nowrap;
-  opacity: 0;
   pointer-events: none;
-  transition: opacity 0.12s ease, transform 0.12s ease;
   z-index: 1;
 }
 
 .bar:hover .bar-tip {
-  opacity: 1;
-  transform: translateX(-50%) translateY(0);
+  display: block;
+  animation: tip-in 0.12s ease-out;
+}
+
+@keyframes tip-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(4px); }
 }
 
 .bar-good {
@@ -932,6 +937,212 @@ html[data-fx="off"] .waiting-dots span {
   .final-score,
   .opp-status,
   .waiting-dots span {
+    animation: none;
+  }
+}
+
+/* ---------- Ranked ---------- */
+.mode-rating {
+  color: var(--accent);
+  font-size: 0.9rem;
+  margin-left: 8px;
+}
+
+.radar {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  border: 2px solid var(--accent);
+  position: relative;
+  margin: 8px 0;
+}
+
+.radar::before,
+.radar::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 50%;
+  border: 2px solid var(--accent);
+  animation: ping 1.8s ease-out infinite;
+}
+
+.radar::after {
+  animation-delay: 0.9s;
+}
+
+@keyframes ping {
+  from { transform: scale(1); opacity: 0.8; }
+  to { transform: scale(2.2); opacity: 0; }
+}
+
+.queue-stats {
+  color: var(--sub);
+  font-size: 0.8rem;
+}
+
+.found-name {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--accent);
+  animation: slam 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.rating-ticker {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 8px;
+  animation: fade-up 0.4s 0.5s ease-out backwards;
+}
+
+.rating-label {
+  color: var(--sub);
+  font-size: 0.8rem;
+}
+
+.rating-now {
+  font-size: 1.6rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.rating-delta {
+  font-weight: 700;
+}
+
+.rating-delta.up {
+  color: var(--correct);
+}
+
+.rating-delta.down {
+  color: var(--wrong);
+}
+
+html[data-fx="off"] .radar::before,
+html[data-fx="off"] .radar::after,
+html[data-fx="off"] .found-name,
+html[data-fx="off"] .rating-ticker {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .radar::before,
+  .radar::after,
+  .found-name,
+  .rating-ticker {
+    animation: none;
+  }
+}
+
+/* ---------- Code-Off summary ---------- */
+.summary {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 4px 0 12px;
+  animation: fade-up 0.4s 0.7s ease-out backwards;
+}
+
+.h2h {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  row-gap: 4px;
+  column-gap: 16px;
+  text-align: center;
+}
+
+.h2h-row {
+  display: contents; /* its three cells sit directly in the grid */
+}
+
+.h2h-head {
+  color: var(--sub);
+  font-size: 0.75rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.h2h-label {
+  color: var(--sub);
+  font-size: 0.75rem;
+  align-self: center;
+}
+
+.h2h-value {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.h2h-value.best {
+  color: var(--correct);
+}
+
+.duel-chart {
+  height: 110px;
+  display: flex;
+  gap: 10px;
+  padding: 12px 12px 6px;
+  background: var(--surface);
+  border-radius: 8px;
+}
+
+.duel-round {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+}
+
+.duel-bars {
+  flex: 1;
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+}
+
+.duel-label {
+  color: var(--sub);
+  font-size: 0.65rem;
+  text-align: center;
+}
+
+.bar.faded {
+  opacity: 0.45;
+}
+
+.bar.faded:hover {
+  opacity: 0.8;
+}
+
+html[data-fx="off"] .summary {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .summary {
+    animation: none;
+  }
+}
+
+/* ---------- Code-Off streak ---------- */
+.hot-streak {
+  color: var(--accent);
+  font-size: 0.7rem;
+  font-weight: 700;
+  display: inline-block;
+  animation: breathe 1.2s ease-in-out infinite;
+}
+
+html[data-fx="off"] .hot-streak {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hot-streak {
     animation: none;
   }
 }

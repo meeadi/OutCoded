@@ -1,16 +1,21 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { api, type Profile } from '../lib/api'
 import { supabase } from '../lib/supabase'
 import CodeOff from './CodeOff'
 import Menu from './Menu'
 import PuzzleRush from './PuzzleRush'
+import Queue from './Queue'
 import UsernamePicker from './UsernamePicker'
 
 type Props = {
   effects: boolean
 }
 
-type Mode = { kind: 'menu' } | { kind: 'solo' } | { kind: 'codeoff'; code: string }
+type Mode =
+  | { kind: 'menu' }
+  | { kind: 'solo' }
+  | { kind: 'queue' }
+  | { kind: 'codeoff'; code: string }
 
 // An invite link looks like ...?match=abc123
 function initialMode(): Mode {
@@ -43,18 +48,29 @@ export default function Home({ effects }: Props) {
     }
   }, [])
 
-  function goToMenu() {
+  const goToMenu = useCallback(() => {
     setMatchInUrl(null)
     setMode({ kind: 'menu' })
-  }
+    api.me().then(setProfile).catch(() => {}) // pick up a new rating after a ranked match
+  }, [])
 
-  async function startCodeOff() {
+  // Stable on purpose: the queue reconnects if this function changes.
+  const joinMatch = useCallback((code: string) => {
+    setMatchInUrl(code)
+    setMode({ kind: 'codeoff', code })
+  }, [])
+
+  const findRanked = useCallback(() => {
+    setMatchInUrl(null)
+    setMode({ kind: 'queue' })
+  }, [])
+
+  async function startFriendMatch() {
     setCreating(true)
     setError(null)
     try {
       const { code } = await api.createMatch()
-      setMatchInUrl(code)
-      setMode({ kind: 'codeoff', code })
+      joinMatch(code)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -71,11 +87,19 @@ export default function Home({ effects }: Props) {
     <div className="home">
       {mode.kind === 'menu' && (
         <>
-          <Menu onSolo={() => setMode({ kind: 'solo' })} onCodeOff={startCodeOff} busy={creating} />
+          <Menu
+            rating={profile.rating}
+            rd={profile.rating_deviation}
+            onSolo={() => setMode({ kind: 'solo' })}
+            onRanked={findRanked}
+            onFriend={startFriendMatch}
+            busy={creating}
+          />
           {error && <p className="auth-message">{error}</p>}
         </>
       )}
       {mode.kind === 'solo' && <PuzzleRush effects={effects} />}
+      {mode.kind === 'queue' && <Queue onMatched={joinMatch} onCancel={goToMenu} />}
       {mode.kind === 'codeoff' && (
         <CodeOff
           // A new key for every match means a fresh connection and fresh state.
@@ -83,7 +107,7 @@ export default function Home({ effects }: Props) {
           code={mode.code}
           effects={effects}
           onExit={goToMenu}
-          onNewMatch={startCodeOff}
+          onNewMatch={(rated) => (rated ? findRanked() : startFriendMatch())}
         />
       )}
 

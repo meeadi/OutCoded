@@ -1,7 +1,7 @@
-"""Code-Off: create a match, look one up, and play it over a WebSocket."""
+"""Code-Off: create a friend match, find a ranked one, and play over WebSockets."""
 
 import asyncio
-import secrets
+import logging
 from uuid import UUID
 
 import asyncpg
@@ -10,16 +10,15 @@ from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel
 
 from app.auth import CurrentUser, decode_token, get_current_user
+from app.codes import new_code
 from app.config import get_settings
 from app.db import ensure_profile, get_conn
 from app.events import log_event
 from app.match_room import RoomError, registry
+from app.matchmaking import Entry, matchmaker
 
 router = APIRouter(tags=["matches"])
-
-# No 0/o, 1/l/i: codes are easy to read out loud.
-CODE_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789"
-CODE_LENGTH = 6
+logger = logging.getLogger("outcoded.matches")
 
 
 class MatchCreated(BaseModel):
@@ -32,15 +31,12 @@ class MatchInfo(BaseModel):
     host: str | None
 
 
-def new_code() -> str:
-    return "".join(secrets.choice(CODE_ALPHABET) for _ in range(CODE_LENGTH))
-
-
 @router.post("/matches", response_model=MatchCreated, status_code=status.HTTP_201_CREATED)
 async def create_match(
     user: CurrentUser = Depends(get_current_user),
     conn: asyncpg.Connection = Depends(get_conn),
 ) -> MatchCreated:
+    """A casual match against a friend, joined through an invite link."""
     await ensure_profile(conn, user.id)
     username = await conn.fetchval("select username from public.profiles where id = $1", user.id)
     if not username:
@@ -78,28 +74,36 @@ async def match_info(
     return MatchInfo(**dict(row))
 
 
-@router.websocket("/ws/matches/{code}")
-async def match_socket(websocket: WebSocket, code: str) -> None:
-    await websocket.accept()
-
-    # Browsers can't put a token in WebSocket headers, so it's the first message instead.
+async def _authenticate(websocket: WebSocket) -> UUID | None:
+    """Browsers can't put a token in WebSocket headers, so it's the first message instead."""
     try:
         first = await asyncio.wait_for(websocket.receive_json(), timeout=10)
         claims = await run_in_threadpool(decode_token, str(first.get("token", "")))
-        user_id = UUID(claims["sub"])
+        return UUID(claims["sub"])
     except Exception:
         await _reject(websocket, "Please sign in again.", 4001)
-        return
+        return None
 
-    room = await registry.get(code, websocket.app.state.pool, get_settings().answer_grace_ms)
-    if room is None:
-        await _reject(websocket, "This match doesn't exist or is already over.", 4004)
+
+@router.websocket("/ws/matches/{code}")
+async def match_socket(websocket: WebSocket, code: str) -> None:
+    await websocket.accept()
+    user_id = await _authenticate(websocket)
+    if user_id is None:
         return
 
     try:
+        room = await registry.get(code, websocket.app.state.pool, get_settings().answer_grace_ms)
+        if room is None:
+            await _reject(websocket, "This match doesn't exist or is already over.", 4004)
+            return
         await room.join(user_id, websocket)
     except RoomError as error:
         await _reject(websocket, str(error), 4003)
+        return
+    except Exception:
+        logger.exception("Couldn't join match %s", code)
+        await _reject(websocket, "Something went wrong on our side. Try again.", 1011)
         return
 
     try:
@@ -114,6 +118,36 @@ async def match_socket(websocket: WebSocket, code: str) -> None:
         pass
     finally:
         await room.leave(user_id, websocket)
+
+
+@router.websocket("/ws/queue")
+async def queue_socket(websocket: WebSocket) -> None:
+    """Ranked matchmaking. Stay connected while searching; close to stop searching."""
+    await websocket.accept()
+    user_id = await _authenticate(websocket)
+    if user_id is None:
+        return
+
+    pool: asyncpg.Pool = websocket.app.state.pool
+    async with pool.acquire() as conn:
+        profile = await conn.fetchrow(
+            "select username, rating from public.profiles where id = $1", user_id
+        )
+    if profile is None or not profile["username"]:
+        await _reject(websocket, "Pick a username before playing.", 4003)
+        return
+
+    entry = Entry(user_id=user_id, username=profile["username"], rating=profile["rating"], socket=websocket)
+    try:
+        await matchmaker.join(entry, pool)
+        while True:
+            await websocket.receive_text()  # nothing to receive; just wait for the browser to leave
+    except WebSocketDisconnect:
+        pass
+    except Exception:
+        logger.exception("Queue connection failed")
+    finally:
+        await matchmaker.leave(user_id, websocket)
 
 
 async def _reject(websocket: WebSocket, message: str, code: int) -> None:

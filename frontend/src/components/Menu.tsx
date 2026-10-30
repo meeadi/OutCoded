@@ -1,22 +1,27 @@
 import { useEffect } from 'react'
+import { formatRating } from '../lib/rating'
 
 type Props = {
+  rating: number
+  rd: number
   onSolo: () => void
-  onCodeOff: () => void
+  onRanked: () => void
+  onFriend: () => void
   busy: boolean
 }
 
-export default function Menu({ onSolo, onCodeOff, busy }: Props) {
-  // Keyboard: 1 for solo, 2 for code-off.
+export default function Menu({ rating, rd, onSolo, onRanked, onFriend, busy }: Props) {
+  // Keyboard: 1 solo, 2 ranked, 3 friend.
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
       if (busy) return
       if (event.key === '1') onSolo()
-      if (event.key === '2') onCodeOff()
+      if (event.key === '2') onRanked()
+      if (event.key === '3') onFriend()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onSolo, onCodeOff, busy])
+  }, [onSolo, onRanked, onFriend, busy])
 
   return (
     <div className="menu">
@@ -25,10 +30,17 @@ export default function Menu({ onSolo, onCodeOff, busy }: Props) {
         <span className="mode-name">solo rush</span>
         <span className="mode-desc">10 questions. just you and the clock.</span>
       </button>
-      <button className="mode" onClick={onCodeOff} disabled={busy}>
+      <button className="mode" onClick={onRanked} disabled={busy}>
         <span className="option-key">2</span>
-        <span className="mode-name">code-off</span>
-        <span className="mode-desc">1v1 a friend. 5 rounds. loser gets outcoded.</span>
+        <span className="mode-name">
+          ranked code-off <span className="mode-rating">{formatRating(rating, rd)}</span>
+        </span>
+        <span className="mode-desc">get matched with someone your level. rating on the line.</span>
+      </button>
+      <button className="mode" onClick={onFriend} disabled={busy}>
+        <span className="option-key">3</span>
+        <span className="mode-name">code-off a friend</span>
+        <span className="mode-desc">send a link. 5 rounds. no rating, just bragging rights.</span>
       </button>
     </div>
   )
