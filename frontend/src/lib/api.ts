@@ -11,6 +11,8 @@ export type Question = {
   code: string | null
   options: string[]
   time_limit_s: number
+  rating: number
+  rating_deviation: number
 }
 
 export type NextQuestion = {

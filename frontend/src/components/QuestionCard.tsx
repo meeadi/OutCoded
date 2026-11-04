@@ -1,5 +1,7 @@
 import type { Question } from '../lib/api'
 
+const CALIBRATED_RD = 150
+
 type Props = {
   question: Question
   roundKey: string // changes for every new question, which restarts the timer
@@ -22,6 +24,7 @@ export default function QuestionCard({
 }: Props) {
   const playState = running ? 'running' : 'paused'
   const panicAt = Math.max(0, question.time_limit_s - 5)
+  const calibrated = question.rating_deviation <= CALIBRATED_RD
 
   function optionClass(index: number) {
     if (correctChoice !== null) {
@@ -57,6 +60,12 @@ export default function QuestionCard({
 
       <p className="meta">
         {question.category} · {question.difficulty}
+        {calibrated && (
+          <span title="difficulty rating, calibrated from players' answers">
+            {' '}
+            · {Math.round(question.rating)}
+          </span>
+        )}
       </p>
       <h2 className="prompt">{question.prompt}</h2>
       {question.code && (

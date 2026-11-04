@@ -220,7 +220,7 @@ class MatchRoom:
             question = await conn.fetchrow(
                 """
                 select id, format, category, language, difficulty, prompt, code,
-                       options, correct_index, explanation, time_limit_s
+                       options, correct_index, explanation, time_limit_s, rating, rating_deviation
                 from public.questions
                 where status = 'active' and not (id = any($1::uuid[]))
                 order by random()
@@ -276,6 +276,8 @@ class MatchRoom:
                         "code": question["code"],
                         "options": game.apply_order(question["options"], orders[player.id]),
                         "time_limit_s": question["time_limit_s"],
+                        "rating": question["rating"],
+                        "rating_deviation": question["rating_deviation"],
                     },
                 },
             )

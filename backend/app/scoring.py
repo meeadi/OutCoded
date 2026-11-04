@@ -6,7 +6,7 @@ from uuid import UUID
 
 import asyncpg
 
-from app import game
+from app import game, glicko2
 from app.events import log_event
 
 
@@ -78,6 +78,8 @@ async def score_attempt(
             else 0
         )
 
+        question_rating = await _calibrate_question(conn, row["question_id"], user_id, correct)
+
         await conn.execute(
             """
             update public.attempts
@@ -92,6 +94,7 @@ async def score_attempt(
             response_ms,
             points,
         )
+
         await log_event(
             conn,
             "answer_submitted",
@@ -103,6 +106,8 @@ async def score_attempt(
             timed_out=timed_out,
             response_ms=response_ms,
             points=points,
+            question_rating_before=question_rating[0],
+            question_rating_after=question_rating[1],
         )
 
     return ScoredAnswer(
@@ -113,3 +118,34 @@ async def score_attempt(
         correct_choice=game.to_displayed_index(row["correct_index"], order),
         explanation=row["explanation"],
     )
+
+async def _calibrate_question(
+    conn: asyncpg.Connection, question_id: UUID, user_id: UUID, correct: bool
+) -> tuple[float, float]:
+    """Update the question's difficulty rating from this answer. Returns (before, after)."""
+    question = await conn.fetchrow(
+        """
+        select rating, rating_deviation, volatility
+        from public.questions where id = $1
+        for update
+        """,
+        question_id,
+    )
+    player = await conn.fetchrow(
+        "select rating, rating_deviation from public.profiles where id = $1", user_id
+    )
+    before = glicko2.Rating(question["rating"], question["rating_deviation"], question["volatility"])
+    opponent = glicko2.Rating(player["rating"], player["rating_deviation"]) if player else glicko2.Rating()
+    after = glicko2.question_after_answer(before, opponent, correct)
+    await conn.execute(
+        """
+        update public.questions
+        set rating = $2, rating_deviation = $3, volatility = $4
+        where id = $1
+        """,
+        question_id,
+        after.rating,
+        after.rd,
+        after.volatility,
+    )
+    return round(before.rating, 1), round(after.rating, 1)

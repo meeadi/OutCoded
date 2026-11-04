@@ -15,6 +15,8 @@ class ServedQuestion(BaseModel):
     code: str | None
     options: list[str]
     time_limit_s: int
+    rating: float #calibrated difficulty 
+    rating_deviation: float #uncertainty in the difficulty
 
 
 class NextQuestionResponse(BaseModel):

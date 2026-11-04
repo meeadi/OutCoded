@@ -21,7 +21,7 @@ from app.scoring import AlreadyAnswered, AttemptNotFound, InvalidChoice, score_a
 router = APIRouter(prefix="/solo", tags=["solo"])
 
 _PICK_QUESTION = """
-    select id, format, category, language, difficulty, prompt, code, options, time_limit_s
+    select id, format, category, language, difficulty, prompt, code, options, time_limit_s, rating, rating_deviation
     from public.questions
     where status = 'active'
       and ($3 or id not in (
@@ -84,6 +84,8 @@ async def next_question(
             code=question["code"],
             options=game.apply_order(question["options"], order),
             time_limit_s=question["time_limit_s"],
+            rating=question["rating"],
+            rating_deviation=question["rating_deviation"],
         ),
     )
 

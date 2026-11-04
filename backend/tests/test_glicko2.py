@@ -1,7 +1,15 @@
 import pytest
 
-from app.glicko2 import DRAW, LOSS, WIN, Rating, match_update, update
-
+from app.glicko2 import (
+    DRAW,
+    LOSS,
+    QUESTION_MIN_RD,
+    WIN,
+    Rating,
+    match_update,
+    question_after_answer,
+    update,
+)
 
 def test_matches_glickmans_worked_example():
     # The example from Glickman's paper: a 1500 player beats a 1400,
@@ -50,3 +58,23 @@ def test_inactivity_only_grows_uncertainty_and_caps_at_350():
     after = update(player, [])
     assert after.rating == 1700
     assert 340 < after.rd <= 350
+
+def test_question_gets_easier_when_solved_and_harder_when_missed():
+    question = Rating(1500, 350)
+    player = Rating(1500, 100)
+    assert question_after_answer(question, player, correct=True).rating < 1500
+    assert question_after_answer(question, player, correct=False).rating > 1500
+
+
+def test_a_weak_player_solving_it_says_more_than_a_strong_one():
+    question = Rating(1500, 200)
+    by_weak = question_after_answer(question, Rating(1200, 80), correct=True)
+    by_strong = question_after_answer(question, Rating(1800, 80), correct=True)
+    assert 1500 - by_weak.rating > 1500 - by_strong.rating
+
+
+def test_question_uncertainty_never_drops_below_the_floor():
+    question = Rating(1500, 31)
+    for _ in range(50):
+        question = question_after_answer(question, Rating(1500, 50), correct=True)
+    assert question.rd >= QUESTION_MIN_RD

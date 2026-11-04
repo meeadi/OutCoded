@@ -117,3 +117,16 @@ def update(player: Rating, results: list[tuple[Rating, float]], tau: float = TAU
 def match_update(a: Rating, b: Rating, score_a: float) -> tuple[Rating, Rating]:
     """Update both players after one match. score_a is WIN, DRAW or LOSS for player a."""
     return update(a, [(b, score_a)]), update(b, [(a, 1 - score_a)])
+
+QUESTION_MIN_RD = 30.0  # keeps questions responsive even after thousands of answers
+
+
+def question_after_answer(question: Rating, player: Rating, correct: bool) -> Rating:
+    """Treat each answer as a game between the player and the question.
+
+    The question "wins" when the player gets it wrong. Beating a question
+    is less informative coming from a strong player than from a weak one,
+    which Glicko-2 handles through the player's rating and uncertainty.
+    """
+    new = update(question, [(player, LOSS if correct else WIN)])
+    return Rating(new.rating, max(new.rd, QUESTION_MIN_RD), new.volatility)
