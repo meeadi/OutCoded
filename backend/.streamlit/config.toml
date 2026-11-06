@@ -1,0 +1,12 @@
+# Streamlit settings for the analytics dashboard (used when run from the backend folder).
+
+[server]
+# The dashboard can read everything in the database: keep it on your own machine.
+address = "localhost"
+headless = true
+
+[browser]
+gatherUsageStats = false
+
+[client]
+toolbarMode = "minimal"

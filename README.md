@@ -150,6 +150,23 @@ Every serve and answer also writes a row to the `events` table, which is the raw
 
 The thresholds were tuned on simulated players so that honest players are rarely flagged (around 1 in 1,000 or fewer). Flags are for a human to review, never automatic bans. Set a flag's `status` to `dismissed` or `confirmed`; re-running the script updates the evidence but keeps your decision.
 
+## Analytics dashboard
+
+A Streamlit dashboard covering activity, retention cohorts, question health and cheat-flag review.
+
+```bash
+cd backend
+pip install -r requirements-dashboard.txt
+streamlit run dashboard/app.py
+```
+
+It connects with `DATABASE_URL`, which can read everything, so it only listens on localhost. Run it on your own machine; never deploy it publicly.
+
+- **Overview**: active players, answers by mode, and when people play (Indian time)
+- **Retention**: next-day and within-a-week return rates, plus weekly cohorts
+- **Questions**: real difficulty vs label, time-limit advice (1.5× the time 90% of right answers took), the favourite wrong answer, and a warning when a wrong option beats the right one
+- **Cheat flags**: evidence, the player's recent answers, and confirm/dismiss/reopen
+
 ## Writing questions
 
 Questions live in `backend/data/questions.csv`. In Google Sheets, Alt+Enter adds a line break inside a cell, which you need for code.
@@ -178,5 +195,5 @@ Check the file first with `python scripts/import_questions.py --dry-run`. A brok
 2. ✅ Frontend with solo puzzle rush
 3. ✅ Code-Off: 1v1 matches via friend link
 4. ✅ Matchmaking, Glicko-2 ratings, leaderboard, player pages
-5. 🚧 Data layer: ✅ question calibration, ✅ cheat flags, analytics dashboard
+5. ✅ Data layer: Question calibration, Cheat flags, Analytics dashboard
 6. Polish and pilot: soundtrack, reconnecting, deployment, a uni coding cell tournament
