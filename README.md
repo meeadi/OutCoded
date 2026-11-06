@@ -1,109 +1,90 @@
 # OutCoded
 
-**Chess.com for coding puzzles.** Quick, rated rounds of *predict the output*, *spot the bug* and quickfire questions, solo or head-to-head in live 1v1 **Code-Offs**.
+Chess.com for coding puzzles. You play quick, rated rounds of *predict the output*, *spot the bug* and quickfire questions, either solo or head-to-head against other players.
 
-As AI writes more of the code, the human job shifts to reading it, judging it and catching where it's wrong. OutCoded trains exactly that, and makes it competitive.
+Built with React + TypeScript, FastAPI and Supabase (Postgres). The UI is minimal, keyboard-first and inspired by Monkeytype, with a few goofy effects thrown in.
 
 ## Features
 
-- **Solo rush:** sessions of 10 questions against a draining timer, keyboard-first (1–4 to answer, Enter for next). Ends with a rank (S to F), accuracy, average time, best streak and a per-question speed chart.
-- **Code-Off:** challenge a friend with an invite link. Five rounds, same question at the same moment, points for being right plus a bonus for being fast. You see when your opponent locks in, but never what they picked.
-- **Effects:** streak confetti, screen shake and red flash on wrong answers, "clutch!" and "too easy" stamps, a timer that panics in the last 5 seconds. One toggle turns them off, and the system's reduced-motion setting is respected automatically.
-- **Themes:** midnight, paper and matcha, built on CSS variables.
-- **Accounts:** email sign-in, usernames that are unique regardless of capitalisation, and goofy random name suggestions.
+- **Solo puzzle rush**: 10-question sessions with streaks, stamps and a results screen
+- **Code-Off**: live 1v1 matches over WebSockets. Friend links play casual matches; the matchmaking queue plays ranked ones
+- **Glicko-2 ratings**: implemented from Glickman's paper. Ratings show a `?` while they're still provisional
+- **Leaderboard and player pages**: with rating history charts
+- **Question calibration**: every answer counts as a mini rated game between the player and the question, so difficulty ratings come from real results
+- **Cheat flags**: suspicious patterns get flagged for a human to review. Nobody is ever banned automatically
+- **Themes**: midnight, paper and matcha. Answer with keys 1–4, and switch effects off if you want calm
 
-## How it works
+## The one rule
 
-**The server is the referee.** Everything that decides a score happens on the backend:
+**The server is the referee.** The browser never receives the correct answer before the reveal. The server times every answer with the database clock, and it decides what counts. Each player gets their own shuffle of the options, so "it's B" can't be passed around. The database enforces this too: signed-in users can't read the answer keys or other players' attempts, and can't change ratings.
 
-- The browser never receives the correct answer until the question is over.
-- Response times are measured with the database clock, not the player's.
-- Options are shuffled per attempt (and per player in a Code-Off), so "it's option 2" can't be shared.
-- The database enforces this too: Row Level Security means signed-in users can't read questions, answers or match data, and can't change their own rating.
-
-**Code-Offs run over WebSockets.** Each live match is a `MatchRoom` on the server. It picks the questions, starts every round for both players at once, scores answers, and declares the winner. Leaving mid-match counts as a forfeit. The full message protocol is documented at the top of `backend/app/match_room.py`.
-
-**Every action is logged** to an `events` table (questions served, answers, matches started and finished). That log is the groundwork for question difficulty calibration, cheat detection and an analytics dashboard.
-
-## Tech stack
-
-| Part | Tech |
-|---|---|
-| Frontend | React 19, TypeScript, Vite, plain CSS with variables, canvas-confetti |
-| Backend | Python 3.12, FastAPI, WebSockets, asyncpg |
-| Database & auth | Supabase (PostgreSQL, Row Level Security, Supabase Auth with asymmetric JWT keys) |
-| Testing | pytest, ruff |
-
-## Project structure
+## Project layout
 
 ```
 OutCoded/
-├── supabase/migrations/       database schema, run in order in the Supabase SQL Editor
-│   ├── 001_init.sql           profiles, questions, attempts, events, security rules
-│   ├── 002_usernames.sql      case-insensitive unique usernames
-│   └── 003_matches.sql        Code-Off matches
+├── supabase/migrations/      run in order in the Supabase SQL Editor (never edit one that's been run)
+│   ├── 001_init.sql              profiles, questions, attempts, events, security rules
+│   ├── 002_usernames.sql
+│   ├── 003_matches.sql
+│   ├── 004_ratings.sql           rated matches, rating history
+│   ├── 005_question_calibration.sql
+│   └── 006_cheat_flags.sql
 ├── backend/
 │   ├── app/
-│   │   ├── main.py            FastAPI app
-│   │   ├── auth.py            verifies Supabase sign-in tokens
-│   │   ├── game.py            game rules: shuffling, timeouts, match points
-│   │   ├── scoring.py         scores one answer (shared by solo and Code-Off)
-│   │   ├── match_room.py      the live Code-Off referee
-│   │   ├── question_bank.py   CSV validation
-│   │   ├── events.py          analytics event log
-│   │   └── routers/           /me, /solo, /matches, /ws/matches
-│   ├── data/questions.csv     the question bank
-│   ├── scripts/               import_questions.py, get_token.py
-│   └── tests/
-└── frontend/
+│   │   ├── main.py               FastAPI app
+│   │   ├── auth.py               verifies Supabase sign-in tokens (JWKS)
+│   │   ├── game.py               game rules: shuffling, timeouts, points
+│   │   ├── scoring.py            scores an answer and calibrates the question
+│   │   ├── glicko2.py            rating maths
+│   │   ├── ratings.py            applies match results
+│   │   ├── match_room.py         one live Code-Off match
+│   │   ├── matchmaking.py        ranked queue pairing
+│   │   ├── cheat_detection.py    suspicious-pattern detectors
+│   │   └── routers/              solo, matches, profiles, leaderboard
+│   ├── data/questions.csv        the question bank
+│   ├── scripts/
+│   │   ├── import_questions.py   load the CSV into the database
+│   │   ├── question_report.py    calibration report: mislabelled questions
+│   │   ├── detect_cheating.py    scan answers and record cheat flags
+│   │   └── get_token.py          sign in as a test user from the terminal
+│   └── tests/                    pytest
+└── frontend/                     React 19 + TypeScript + Vite
     └── src/
-        ├── App.tsx            themes, effects toggle, signed-in vs signed-out
-        ├── components/        Home, Menu, PuzzleRush, CodeOff, QuestionCard, Results, ...
-        └── lib/               api client, Supabase client, effects, session stats
+        ├── components/           Home, PuzzleRush, CodeOff, Queue, Leaderboard, PlayerPage …
+        ├── hooks/                useSession, useAwayTimer
+        └── lib/                  api, supabase, effects, session, rating
 ```
 
-## Running it locally
+## Setup
 
-You need **Python 3.12+**, **Node.js 20+** and a free [Supabase](https://supabase.com) project.
+### 1. Supabase
 
-### 1. Database
-
-1. Create a Supabase project (region: Frankfurt).
-2. In **Project Settings → JWT Keys**, make sure the current key is asymmetric (ECC or RSA), not the legacy shared secret.
-3. In **SQL Editor**, run each file in `supabase/migrations/` **in order**: 001, then 002, then 003.
-4. For development, turn off **Authentication → Sign In / Providers → Email → Confirm email**.
+1. Create a project at [supabase.com](https://supabase.com) and save the database password somewhere safe.
+2. Go to **Project Settings → JWT Keys** and make sure the current key is asymmetric (ECC or RSA). The API refuses tokens signed with the legacy shared secret.
+3. In **SQL Editor**, run each file in `supabase/migrations/`, in order.
 
 ### 2. Backend
 
+You need Python 3.12 or newer.
+
 ```bash
 cd backend
-python3 -m venv .venv
+python -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install -r requirements-dev.txt
 cp .env.example .env
 ```
 
-Fill in `backend/.env`:
-
-| Variable | Where to find it |
-|---|---|
-| `DATABASE_URL` | Supabase → **Connect → Session pooler**. Replace `[YOUR-PASSWORD]` (brackets included). |
-| `SUPABASE_URL` | **Project Settings → API**, Project URL |
-| `SUPABASE_PUBLISHABLE_KEY` | **Project Settings → API Keys**, publishable key (`sb_publishable_...`) |
-| `CORS_ORIGINS` | `http://localhost:5173` |
-
-Then:
+Fill in `.env`. The comments in `.env.example` say where to find each value. Then:
 
 ```bash
 python scripts/import_questions.py
 uvicorn app.main:app --reload
 ```
 
-http://localhost:8000/health should show `{"status":"ok"}`. Interactive API docs are at http://localhost:8000/docs.
+http://localhost:8000/health should return `{"status":"ok"}`. The interactive API docs are at http://localhost:8000/docs.
 
 ### 3. Frontend
-
-In a second terminal:
 
 ```bash
 cd frontend
@@ -115,72 +96,87 @@ Create `frontend/.env.local`:
 ```
 VITE_SUPABASE_URL=https://your-project-ref.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
+# VITE_API_URL=http://localhost:8000   (this is the default)
 ```
 
-Only public values go here, since anything prefixed `VITE_` ends up in the browser. The API address defaults to `http://localhost:8000`; set `VITE_API_URL` to change it.
+Only put public values in `VITE_` variables, because they end up in the browser. The secret key and the database password never belong here.
 
 ```bash
 npm run dev
 ```
 
-Open http://localhost:5173, sign up, and pick a name.
+Open http://localhost:5173.
 
-### Playing a Code-Off against yourself
-
-You need two accounts signed in at once. Use a normal window and a private/incognito window: press **2** in one, then open the invite link in the other.
-
-## Tests
+### 4. Checks
 
 ```bash
-cd backend
-pytest
+cd backend && pytest && ruff check .
+cd frontend && npm run lint && npx tsc -b
 ```
 
-```bash
-cd frontend
-npm run lint
-npm run build      # also type-checks
-```
+## API
+
+| Endpoint | What it does |
+|---|---|
+| `GET /health` | Checks the database connection |
+| `GET /me` | The signed-in player's profile |
+| `PUT /me/username` | Claims a username |
+| `POST /solo/next` | Serves a question with shuffled options and no answer |
+| `POST /solo/answer` | Scores the answer with server time, then reveals the solution |
+| `POST /matches` | Creates a friend match and returns its code |
+| `GET /matches/{code}` | Match info |
+| `WS /ws/matches/{code}` | Plays a Code-Off match |
+| `WS /ws/queue` | Ranked matchmaking queue |
+| `GET /leaderboard` | Top players (shown after 5 ranked matches) |
+| `GET /players/{username}` | A public profile and its rating history |
+
+Every serve and answer also writes a row to the `events` table, which is the raw material for analytics.
+
+## Ratings
+
+- **Players** start at 1500 with a rating deviation (RD) of 350. Only queue matches are rated; friend links stay casual. A rating shows `?` while its RD is above 110.
+- **Questions** start at 1300, 1500 or 1700 depending on their easy/medium/hard label, with an RD of 200. Each answer nudges the rating. Run `python scripts/question_report.py` to list questions whose label doesn't match how players actually do on them.
+
+## Cheat flags
+
+`python scripts/detect_cheating.py` scans recent answers (`--days 30` by default) and records flags in the `cheat_flags` table:
+
+| Flag | What it looks for |
+|---|---|
+| `superhuman_speed` | Right answers faster than the question could be read, counting first attempts only |
+| `overperformance` | Playing far above your rating, by more than luck and rating uncertainty can explain |
+| `robotic_timing` | Answer times too steady to be human |
+| `tab_switching` | Repeatedly leaving the tab, then coming back with the right answer |
+
+The thresholds were tuned on simulated players so that honest players are rarely flagged (around 1 in 1,000 or fewer). Flags are for a human to review, never automatic bans. Set a flag's `status` to `dismissed` or `confirmed`; re-running the script updates the evidence but keeps your decision.
 
 ## Writing questions
 
-Questions live in `backend/data/questions.csv`.
+Questions live in `backend/data/questions.csv`. In Google Sheets, Alt+Enter adds a line break inside a cell, which you need for code.
 
 | Column | Notes |
 |---|---|
-| `slug` | Unique ID like `py-late-binding`. Never change it after importing. |
+| `slug` | Unique ID like `py-late-binding`. Never change it after importing; it's how updates are matched. |
 | `format` | `predict_output`, `spot_bug` or `quickfire` |
 | `category` | e.g. `python`, `sql`, `security`, `git` |
-| `language` | Code language, or empty |
+| `language` | Language for syntax highlighting, or empty |
 | `difficulty` | `easy`, `medium` or `hard` |
-| `prompt`, `code` | The question and optional snippet. Indentation is kept exactly. |
+| `prompt`, `code` | The question and an optional snippet. Indentation is kept exactly. |
 | `option_a` … `option_d` | At least A and B, filled in order |
 | `correct` | `A`, `B`, `C` or `D` |
 | `explanation` | Shown after answering. Explain *why*. |
 | `time_limit_s` | 5 to 300, default 30 |
-| `status` | `active`, `draft` or `retired`. Retire instead of deleting. |
+| `status` | `active`, `draft` or `retired`. Retire questions instead of deleting them. |
 
-Check a file without touching the database, then import:
+Check the file first with `python scripts/import_questions.py --dry-run`. A broken row rejects the whole import, and re-importing never resets a calibrated rating.
 
-```bash
-python scripts/import_questions.py --dry-run
-python scripts/import_questions.py
-```
-
-The importer rejects the whole file if any row is broken, matches existing questions by slug, and never resets a question's difficulty rating. **Run every predict-the-output snippet before importing.** A wrong answer key in a ranked match costs more trust than ten good questions earn.
-
-## Known limitations
-
-- Live matches are kept in server memory: restarting the backend (including `--reload` after saving a Python file) ends matches in progress.
-- Refreshing mid-match counts as leaving: there's no reconnecting yet.
-- Invite links only work for people who can reach your server. They're `localhost` until it's deployed.
+**Always run predict-the-output snippets before importing.** One wrong answer key in a ranked match costs more trust than ten good questions earn.
 
 ## Roadmap
 
-- [x] Foundation: database, API, sign-in, question bank, event logging
-- [x] Solo rush: themes, effects, sessions, results screen, usernames
-- [x] Code-Off: live 1v1 matches with invite links
-- [ ] Ranked: Glicko-2 ratings, matchmaking queue, leaderboard
-- [ ] Data layer: self-calibrating question difficulty, cheat detection, analytics dashboard
-- [ ] Original soundtrack and sound effects
-- [ ] Reconnecting mid-match, deployment, and a pilot tournament at a university coding cell
+1. ✅ Database, API, sign-in, seed questions, event logging
+2. ✅ Frontend with solo puzzle rush
+3. ✅ Code-Off: 1v1 matches via friend link
+4. ✅ Matchmaking, Glicko-2 ratings, leaderboard, player pages
+5. 🚧 Data layer: ✅ question calibration, ✅ cheat flags, analytics dashboard
+6. Polish and pilot: soundtrack, reconnecting, deployment, a uni coding cell tournament
