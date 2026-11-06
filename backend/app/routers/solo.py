@@ -98,7 +98,7 @@ async def submit_answer(
 ) -> AnswerResponse:
     try:
         scored = await score_attempt(
-            conn, body.attempt_id, user.id, body.choice, get_settings().answer_grace_ms
+            conn, body.attempt_id, user.id, body.choice, get_settings().answer_grace_ms, body.away_ms
         )
     except AttemptNotFound:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Attempt not found") from None

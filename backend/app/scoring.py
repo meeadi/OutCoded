@@ -38,8 +38,10 @@ async def score_attempt(
     user_id: UUID,
     choice: int | None,
     grace_ms: int,
+    away_ms: int | None = None,
 ) -> ScoredAnswer:
-    """`choice` is the position the player clicked, or None if their time ran out."""
+    """`choice` is the position the player clicked, or None if their time ran out.
+    'away_ms' is how long the tab was hidden or unfocused during the question (browser-reported hint, not proof)."""
     async with conn.transaction():
         # Lock the attempt row so a double-click can't be scored twice.
         row = await conn.fetchrow(
@@ -84,7 +86,7 @@ async def score_attempt(
             """
             update public.attempts
             set answered_at = clock_timestamp(), chosen_index = $2, is_correct = $3,
-                timed_out = $4, response_ms = $5, points = $6
+                timed_out = $4, response_ms = $5, points = $6, away_ms = $7
             where id = $1
             """,
             attempt_id,
@@ -93,6 +95,7 @@ async def score_attempt(
             timed_out,
             response_ms,
             points,
+            away_ms,
         )
 
         await log_event(

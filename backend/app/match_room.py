@@ -8,7 +8,8 @@ Protocol (all messages are JSON with a "type"):
 
   browser -> server
     {"type": "auth", "token": "..."}           first message, always
-    {"type": "answer", "choice": 0-3 | null}   null = my timer ran out
+    {"type": "answer", "choice": 0-3 | null,   null = my timer ran out
+     "away_ms": int | null}                    time the tab was out of focus
 
   server -> browser
     waiting            you're in, waiting for an opponent (says whether it's ranked)
@@ -145,25 +146,27 @@ class MatchRoom:
         await self._abandon("Your opponent didn't show up. Match cancelled, no rating change.")
 
     # ------------------------------------------------------------------ answers
-    async def handle_answer(self, user_id: UUID, choice: object) -> None:
+    async def handle_answer(self, user_id: UUID, choice: object, away_ms: object = None) -> None:
         if choice is not None and (not isinstance(choice, int) or isinstance(choice, bool)):
             return  # ignore malformed messages
+        if not isinstance(away_ms, int) or isinstance(away_ms, bool) or not 0<= away_ms <= 600_000:
+            away_ms = None # drop anything odd
         async with self.lock:
             player = self.players.get(user_id)
             if player is None or player.attempt_id is None or player.answer is not None:
                 return  # no round running, or already answered
-            await self._score(player, choice)
+            await self._score(player, choice, away_ms)
             opponent = self._opponent(player)
             if opponent:
                 await _send(opponent.socket, {"type": "opponent_answered"})
             if all(p.answer is not None for p in self.players.values()):
                 self.round_done.set()
 
-    async def _score(self, player: Player, choice: int | None) -> None:
+    async def _score(self, player: Player, choice: int | None, away_ms: int | None = None) -> None:
         async with self.pool.acquire() as conn:
             try:
                 player.answer = await score_attempt(
-                    conn, player.attempt_id, player.id, choice, self.grace_ms
+                    conn, player.attempt_id, player.id, choice, self.grace_ms, away_ms
                 )
             except AlreadyAnswered:
                 return

@@ -27,6 +27,12 @@ class NextQuestionResponse(BaseModel):
 class AnswerRequest(BaseModel):
     attempt_id: UUID
     choice: int | None = Field(default=None, ge=0, le=3, description="Position of the option the player clicked (0-based), or null if time ran out")
+    away_ms: int | None = Field(
+        default=None,
+        ge=0,
+        le=600_000,
+        description="How long the tab was hidden or unfocused during the question (browser-reported)",
+    )
 
 
 class AnswerResponse(BaseModel):

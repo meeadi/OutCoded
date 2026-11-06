@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useAwayTimer } from '../hooks/useAwayTimer'
 import { wsUrl, type Question } from '../lib/api'
 import { celebrate, punish, sparkle, victory } from '../lib/effects'
 import { stampFor } from '../lib/session'
@@ -66,6 +67,7 @@ export default function CodeOff({ code, effects, onExit, onNewMatch }: Props) {
   const [streakShown, setStreakShown] = useState(0)
 
   const socket = useRef<WebSocket | null>(null)
+  const away = useAwayTimer()
   const streak = useRef(0)
   // Read the latest fx setting inside socket handlers without reconnecting when it changes.
   const effectsRef = useRef(effects)
@@ -97,6 +99,7 @@ export default function CodeOff({ code, effects, onExit, onNewMatch }: Props) {
           setStatus('starting')
           break
         case 'round':
+          away.reset()
           setRound(message)
           setPicked(null)
           setLocked(false)
@@ -154,7 +157,7 @@ export default function CodeOff({ code, effects, onExit, onNewMatch }: Props) {
       done = true
       ws.close()
     }
-  }, [code])
+  }, [code, away])
 
   // Tick countdowns down once per second.
   useEffect(() => {
@@ -169,9 +172,9 @@ export default function CodeOff({ code, effects, onExit, onNewMatch }: Props) {
       if (status !== 'playing' || locked) return
       setPicked(choice)
       setLocked(true)
-      socket.current?.send(JSON.stringify({ type: 'answer', choice }))
+      socket.current?.send(JSON.stringify({ type: 'answer', choice, away_ms: away.read() }))
     },
-    [status, locked],
+    [status, locked, away],
   )
 
   // Keyboard: 1-4 to answer.

@@ -119,8 +119,8 @@ export const api = {
   me: () => request<Profile>('GET', '/me'),
   setUsername: (username: string) => request<Profile>('PUT', '/me/username', { username }),
   nextQuestion: () => request<NextQuestion>('POST', '/solo/next'),
-  submitAnswer: (attemptId: string, choice: number | null) =>
-    request<AnswerResult>('POST', '/solo/answer', { attempt_id: attemptId, choice }),
+  submitAnswer: (attemptId: string, choice: number | null, awayMs: number) =>
+    request<AnswerResult>('POST', '/solo/answer', { attempt_id: attemptId, choice, away_ms: awayMs }),
   createMatch: () => request<{code: string} > ('POST', '/matches'),
   leaderboard: () => request<Leaderboard>('GET', '/leaderboard'),
   player: (username: string) =>

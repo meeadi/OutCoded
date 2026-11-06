@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useAwayTimer } from '../hooks/useAwayTimer'
 import { api, type AnswerResult, type NextQuestion } from '../lib/api'
 import { celebrate, punish, sparkle, victory } from '../lib/effects'
 import { currentStreak, SESSION_LENGTH, stampFor, type Round } from '../lib/session'
@@ -18,13 +19,16 @@ export default function PuzzleRush({ effects }: Props) {
   const [result, setResult] = useState<AnswerResult | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [rounds, setRounds] = useState<Round[]>([])
+  const away = useAwayTimer()
 
-  const showQuestion = useCallback((next: NextQuestion) => {
-    setCurrent(next)
-    setPicked(null)
-    setResult(null)
-    setPhase('question')
-  }, [])
+  const showQuestion = useCallback(
+     (next: NextQuestion) => {
+       away.reset()
+       setCurrent(next)
+       setPicked(null)
+       setResult(null)
+       setPhase('question')
+     }, [away],)
 
   const showError = useCallback((e: unknown) => {
     setError(e instanceof Error ? e.message : String(e))
@@ -62,7 +66,7 @@ export default function PuzzleRush({ effects }: Props) {
       setPicked(choice)
       setPhase('submitting')
       try {
-        const res = await api.submitAnswer(current.attempt_id, choice)
+        const res = await api.submitAnswer(current.attempt_id, choice, away.read())
         const round = { correct: res.correct, timedOut: res.timed_out, ms: res.response_ms }
         const streak = currentStreak([...rounds, round])
         setResult(res)
@@ -77,7 +81,7 @@ export default function PuzzleRush({ effects }: Props) {
         showError(e)
       }
     },
-    [phase, current, rounds, effects, showError],
+    [phase, current, rounds, effects, showError, away],
   )
 
   // Load the first question when the component appears.
