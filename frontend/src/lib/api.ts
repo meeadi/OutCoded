@@ -110,6 +110,11 @@ async function request<T>(method: 'GET' | 'POST' | 'PUT', path: string, body?: u
   return response.json() as Promise<T>
 }
 
+// Ping the backend so it starts waking up early (free hosting sleeps when idle).
+export function wakeServer(): void {
+  fetch(`${API_URL}/health`).catch(() => {})
+}
+
 // WebSocket address for a path on the same backend (http -> ws, https -> wss).
 export function wsUrl(path: string): string {
   return API_URL.replace(/^http/, 'ws') + path

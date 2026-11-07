@@ -3,6 +3,7 @@ import { api, type Profile } from '../lib/api'
 import { supabase } from '../lib/supabase'
 import CodeOff from './CodeOff'
 import Leaderboard from './Leaderboard'
+import LoadingScreen from './LoadingScreen'
 import Menu from './Menu'
 import PlayerPage from './PlayerPage'
 import PuzzleRush from './PuzzleRush'
@@ -40,6 +41,7 @@ export default function Home({ effects }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [mode, setMode] = useState<Mode>(initialMode)
   const [creating, setCreating] = useState(false)
+  const [attempt, setAttempt] = useState(0) // bump to retry loading the profile
 
   useEffect(() => {
     let cancelled = false
@@ -50,7 +52,7 @@ export default function Home({ effects }: Props) {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [attempt])
 
   const goToMenu = useCallback(() => {
     setMatchInUrl(null)
@@ -90,46 +92,63 @@ export default function Home({ effects }: Props) {
     }
   }
 
-  if (!profile) {
-    return error ? <p className="auth-message">{error}</p> : <p className="tagline">loading...</p>
+  if (!profile && error) {
+    return (
+      <div className="load-failed">
+        <p className="auth-message">couldn't reach the server: {error}</p>
+        <button
+          className="btn-primary"
+          onClick={() => {
+            setError(null)
+            setAttempt((a) => a + 1)
+          }}
+        >
+          try again
+        </button>
+      </div>
+    )
   }
+  if (!profile) return <LoadingScreen animate={effects} />
   if (!profile.username) return <UsernamePicker onDone={setProfile} />
 
   return (
     <div className="home">
-      {mode.kind === 'menu' && (
-        <>
-          <Menu
-            rating={profile.rating}
-            rd={profile.rating_deviation}
-            onSolo={() => setMode({ kind: 'solo' })}
-            onRanked={findRanked}
-            onFriend={startFriendMatch}
-            onLeaderboard={() => setMode({ kind: 'leaderboard' })}
-            busy={creating}
+      {/* Keyed by screen, so switching screens replays the fade-in. */}
+      <div className="page" key={mode.kind}>
+        {mode.kind === 'menu' && (
+          <>
+            <Menu
+              rating={profile.rating}
+              rd={profile.rating_deviation}
+              onSolo={() => setMode({ kind: 'solo' })}
+              onRanked={findRanked}
+              onFriend={startFriendMatch}
+              onLeaderboard={() => setMode({ kind: 'leaderboard' })}
+              busy={creating}
+            />
+            {error && <p className="auth-message">{error}</p>}
+          </>
+        )}
+        {mode.kind === 'solo' && <PuzzleRush effects={effects} />}
+        {mode.kind === 'queue' && <Queue onMatched={joinMatch} onCancel={goToMenu} />}
+        {mode.kind === 'leaderboard' && (
+          <Leaderboard me={profile.username} onOpenPlayer={openPlayer} />
+        )}
+        {mode.kind === 'player' && (
+          // The key reloads the page when you jump from one player to another.
+          <PlayerPage key={mode.username} username={mode.username} onOpenPlayer={openPlayer} />
+        )}
+        {mode.kind === 'codeoff' && (
+          <CodeOff
+            // A new key for every match means a fresh connection and fresh state.
+            key={mode.code}
+            code={mode.code}
+            effects={effects}
+            onExit={goToMenu}
+            onNewMatch={(rated) => (rated ? findRanked() : startFriendMatch())}
           />
-          {error && <p className="auth-message">{error}</p>}
-        </>
-      )}
-      {mode.kind === 'solo' && <PuzzleRush effects={effects} />}
-      {mode.kind === 'queue' && <Queue onMatched={joinMatch} onCancel={goToMenu} />}
-      {mode.kind === 'leaderboard' && (
-        <Leaderboard me={profile.username} onOpenPlayer={openPlayer} />
-      )}
-      {mode.kind === 'player' && (
-        // The key reloads the page when you jump from one player to another.
-        <PlayerPage key={mode.username} username={mode.username} onOpenPlayer={openPlayer} />
-      )}
-      {mode.kind === 'codeoff' && (
-        <CodeOff
-          // A new key for every match means a fresh connection and fresh state.
-          key={mode.code}
-          code={mode.code}
-          effects={effects}
-          onExit={goToMenu}
-          onNewMatch={(rated) => (rated ? findRanked() : startFriendMatch())}
-        />
-      )}
+        )}
+      </div>
 
       <p className="signed-in">
         {mode.kind !== 'menu' && (

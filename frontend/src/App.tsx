@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import AuthForm from './components/AuthForm'
 import Home from './components/Home'
+import Landing from './components/Landing'
 import { useSession } from './hooks/useSession'
+import { wakeServer } from './lib/api'
 import { prefersReducedMotion } from './lib/effects'
 
 const THEMES = [
@@ -22,10 +24,26 @@ function loadEffects(): boolean {
   return saved === null ? !prefersReducedMotion() : saved === 'on'
 }
 
+// Seen the landing page already in this tab? Then a refresh skips it.
+function loadEntered(): boolean {
+  return sessionStorage.getItem('entered') === 'yes'
+}
+
 export default function App() {
   const [theme, setTheme] = useState<ThemeId>(loadTheme)
   const [effects, setEffects] = useState(loadEffects)
+  const [entered, setEntered] = useState(loadEntered)
   const { session, loading } = useSession()
+
+  const enter = useCallback(() => {
+    sessionStorage.setItem('entered', 'yes')
+    setEntered(true)
+  }, [])
+
+  // Start waking the backend while people watch the intro or type their password.
+  useEffect(() => wakeServer(), [])
+
+  const page = loading ? 'loading' : session ? 'home' : entered ? 'auth' : 'landing'
 
   // Apply the theme to <html> and remember it for next time.
   useEffect(() => {
@@ -44,7 +62,8 @@ export default function App() {
       <div className="flash" aria-hidden="true" />
       <div className="app">
         <header className="header">
-          <h1 className="logo">
+          {/* Hidden on the landing page, where the big typed logo takes over. */}
+          <h1 className={`logo ${page === 'landing' ? 'logo-hidden' : ''}`}>
             out<span>coded</span>
           </h1>
           <div className="themes">
@@ -69,12 +88,15 @@ export default function App() {
         </header>
 
         <main className="main">
-          {loading ? null : session ? (
-            // The key makes Home start fresh if a different account signs in.
-            <Home key={session.user.id} effects={effects} />
-          ) : (
-            <AuthForm />
-          )}
+          {/* A new key per page replays the fade-in: that's the page transition. */}
+          <div className="page" key={page}>
+            {page === 'home' && session && (
+              // The key makes Home start fresh if a different account signs in.
+              <Home key={session.user.id} effects={effects} />
+            )}
+            {page === 'auth' && <AuthForm />}
+            {page === 'landing' && <Landing animate={effects} onEnter={enter} />}
+          </div>
         </main>
       </div>
     </>

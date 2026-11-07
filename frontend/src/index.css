@@ -91,6 +91,10 @@ button {
   color: var(--accent);
 }
 
+.logo-hidden {
+  visibility: hidden;
+}
+
 .themes {
   display: flex;
   gap: 10px;
@@ -1412,5 +1416,171 @@ html[data-fx="off"] .hot-streak {
 
   .recent-row {
     grid-template-columns: 28px 1fr auto 48px;
+  }
+}
+
+/* ---------- Typed logo, landing, loading ---------- */
+.typed-logo {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+
+.typed-logo .coded {
+  color: var(--accent);
+}
+
+/* A thin Monkeytype-style cursor: solid while typing, blinking while idle. */
+.caret {
+  display: inline-block;
+  width: 0.08em;
+  min-width: 2px;
+  height: 0.85em;
+  margin-left: 0.06em;
+  vertical-align: -0.06em;
+  border-radius: 2px;
+  background: var(--accent);
+  animation: caret-blink 1s step-end infinite;
+}
+
+.caret.solid {
+  animation: none;
+}
+
+@keyframes caret-blink {
+  50% { opacity: 0; }
+}
+
+.landing {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  padding-top: 6vh;
+}
+
+.landing-logo {
+  font-size: clamp(2.6rem, 12vw, 5rem);
+  line-height: 1.1;
+}
+
+.landing-tagline {
+  color: var(--sub);
+  min-height: 1.6em; /* keep the space, so nothing jumps when it appears */
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 0.4s ease, transform 0.4s ease;
+}
+
+.landing.ready .landing-tagline {
+  opacity: 1;
+  transform: none;
+}
+
+.landing .dive-in {
+  margin-top: 8px;
+  padding: 12px 32px;
+  font-size: 1.05rem;
+}
+
+.landing:not(.ready) .dive-in {
+  visibility: hidden;
+}
+
+.landing.ready .dive-in {
+  animation: pop-in 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) 0.25s backwards;
+}
+
+@keyframes pop-in {
+  from { opacity: 0; transform: scale(0.6); }
+}
+
+.landing-hint {
+  color: var(--sub);
+  font-size: 0.8rem;
+  opacity: 0;
+  transition: opacity 0.4s ease 0.6s;
+}
+
+.landing.ready .landing-hint {
+  opacity: 0.8;
+}
+
+.landing-hint kbd {
+  font: inherit;
+  border: 1px solid var(--sub);
+  border-radius: 4px;
+  padding: 0 6px;
+}
+
+@media (hover: none) {
+  .landing-hint { display: none; } /* phones have no enter key to press */
+}
+
+.loading-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  padding-top: 10vh;
+}
+
+.loading-logo {
+  font-size: clamp(2rem, 9vw, 3.2rem);
+}
+
+.loading-note {
+  color: var(--sub);
+  font-size: 0.85rem;
+  opacity: 0;
+  transition: opacity 0.6s ease;
+}
+
+.loading-note.show {
+  opacity: 1;
+}
+
+.load-failed {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding-top: 10vh;
+}
+
+/* ---------- Page transitions: a quick fade-up whenever a screen appears ---------- */
+.page {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  animation: page-in 0.22s ease-out;
+}
+
+@keyframes page-in {
+  from { opacity: 0; transform: translateY(8px); }
+}
+
+html[data-fx="off"] .page,
+html[data-fx="off"] .caret,
+html[data-fx="off"] .landing .dive-in {
+  animation: none;
+}
+
+html[data-fx="off"] .landing-tagline,
+html[data-fx="off"] .landing-hint {
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page,
+  .caret,
+  .landing .dive-in {
+    animation: none;
+  }
+
+  .landing-tagline,
+  .landing-hint {
+    transition: none;
   }
 }
