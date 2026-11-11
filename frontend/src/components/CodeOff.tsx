@@ -48,10 +48,16 @@ type Props = {
   effects: boolean
   onExit: () => void
   onNewMatch: (rated: boolean) => void
+  onLiveChange?: (live: boolean) => void // true while the match is being played
 }
 
-export default function CodeOff({ code, effects, onExit, onNewMatch }: Props) {
+export default function CodeOff({ code, effects, onExit, onNewMatch, onLiveChange }: Props) {
   const [status, setStatus] = useState<Status>('connecting')
+  const live = status === 'starting' || status === 'playing' || status === 'result'
+  useEffect(() => {
+    onLiveChange?.(live)
+  }, [live, onLiveChange])
+  useEffect(() => () => onLiveChange?.(false), [onLiveChange])
   const [rated, setRated] = useState(false)
   const [opponent, setOpponent] = useState('')
   const [round, setRound] = useState<RoundMessage | null>(null)

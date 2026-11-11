@@ -1,22 +1,18 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import AuthForm from './components/AuthForm'
 import Home from './components/Home'
 import Landing from './components/Landing'
+import SideMenu, { type NavState, type NavTarget } from './components/SideMenu'
+import ThemePicker from './components/ThemePicker'
+import { canHover, useHoverOpen } from './hooks/useHoverOpen'
 import { useSession } from './hooks/useSession'
 import { wakeServer } from './lib/api'
 import { prefersReducedMotion } from './lib/effects'
-
-const THEMES = [
-  { id: 'midnight', swatch: '#7c5cff' },
-  { id: 'paper', swatch: '#d9480f' },
-  { id: 'matcha', swatch: '#a3c76d' },
-] as const
-
-type ThemeId = (typeof THEMES)[number]['id']
+import { isThemeId, paintTheme, type ThemeId } from './lib/themes'
 
 function loadTheme(): ThemeId {
   const saved = localStorage.getItem('theme')
-  return THEMES.some((t) => t.id === saved) ? (saved as ThemeId) : 'midnight'
+  return isThemeId(saved) ? saved : 'midnight'
 }
 
 function loadEffects(): boolean {
@@ -34,6 +30,11 @@ export default function App() {
   const [effects, setEffects] = useState(loadEffects)
   const [entered, setEntered] = useState(loadEntered)
   const { session, loading } = useSession()
+  const sideMenu = useHoverOpen()
+  // Home does the navigating (it owns the screens); the menu up here just asks.
+  const navigateRef = useRef<((target: NavTarget) => void) | null>(null)
+  const [navState, setNavState] = useState<NavState | null>(null)
+  const closeSideMenu = useCallback(() => sideMenu.setOpen(false), [sideMenu])
 
   const enter = useCallback(() => {
     sessionStorage.setItem('entered', 'yes')
@@ -47,7 +48,7 @@ export default function App() {
 
   // Apply the theme to <html> and remember it for next time.
   useEffect(() => {
-    document.documentElement.dataset.theme = theme
+    paintTheme(theme)
     localStorage.setItem('theme', theme)
   }, [theme])
 
@@ -60,13 +61,41 @@ export default function App() {
     <>
       {/* Outside .app on purpose: .app shakes, and a shaking parent would trap the flash. */}
       <div className="flash" aria-hidden="true" />
+      {/* Theme scenery: behind the page (neon's grid, sunset's glow) and in front of it (terminal's scanlines). */}
+      <div className="backdrop" aria-hidden="true" />
+      <div className="overlay" aria-hidden="true" />
       <div className="app">
         <header className="header">
-          {/* Hidden on the landing page, where the big typed logo takes over. */}
-          <h1 className={`logo ${page === 'landing' ? 'logo-hidden' : ''}`}>
-            out<span>coded</span>
-          </h1>
-          <div className="themes">
+          <div className="logo-wrap" {...(navState ? sideMenu.hover : {})}>
+            {/* Hidden on the landing page, where the big typed logo takes over. */}
+            <h1 className={`logo ${page === 'landing' ? 'logo-hidden' : ''}`}>
+              {navState ? (
+                // Signed in: the logo opens the side menu.
+                <button
+                  className="logo-button"
+                  aria-expanded={sideMenu.open}
+                  aria-label="outcoded: open menu"
+                  onClick={() => sideMenu.setOpen(canHover() ? true : !sideMenu.open)}
+                >
+                  out<span>coded</span>
+                </button>
+              ) : (
+                <>
+                  out<span>coded</span>
+                </>
+              )}
+            </h1>
+            {navState && (
+              <SideMenu
+                open={sideMenu.open}
+                onClose={closeSideMenu}
+                hover={sideMenu.hover}
+                state={navState}
+                onNavigate={(target) => navigateRef.current?.(target)}
+              />
+            )}
+          </div>
+          <div className="header-right">
             <button
               className="fx-toggle"
               onClick={() => setEffects(!effects)}
@@ -74,16 +103,7 @@ export default function App() {
             >
               fx {effects ? 'on' : 'off'}
             </button>
-            {THEMES.map((t) => (
-              <button
-                key={t.id}
-                className={`theme-dot ${t.id === theme ? 'active' : ''}`}
-                style={{ background: t.swatch }}
-                onClick={() => setTheme(t.id)}
-                aria-label={`${t.id} theme`}
-                title={t.id}
-              />
-            ))}
+            <ThemePicker theme={theme} onChange={setTheme} />
           </div>
         </header>
 
@@ -92,7 +112,12 @@ export default function App() {
           <div className="page" key={page}>
             {page === 'home' && session && (
               // The key makes Home start fresh if a different account signs in.
-              <Home key={session.user.id} effects={effects} />
+              <Home
+                key={session.user.id}
+                effects={effects}
+                navigateRef={navigateRef}
+                onNavState={setNavState}
+              />
             )}
             {page === 'auth' && <AuthForm />}
             {page === 'landing' && <Landing animate={effects} onEnter={enter} />}

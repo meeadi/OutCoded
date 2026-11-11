@@ -1,4 +1,14 @@
-/* ---------- Themes: each one is just a set of color variables ---------- */
+/* ---------- Themes ----------
+   Colors, plus a few "feel" variables that themes can change:
+   --radius   corner roundness        --edge     border color on cards and options
+   --glow     glow on the logo/accents --lift     shadow under cards and buttons */
+:root {
+  --radius: 8px;
+  --edge: transparent;
+  --glow: none;
+  --lift: none;
+}
+
 :root,
 [data-theme="midnight"] {
   --bg: #14151a;
@@ -67,6 +77,8 @@ button {
 
 /* ---------- Layout ---------- */
 .app {
+  position: relative;
+  z-index: 1; /* above the theme backdrop */
   min-height: 100%;
   max-width: 960px;
   margin: 0 auto;
@@ -89,31 +101,17 @@ button {
 
 .logo span {
   color: var(--accent);
+  text-shadow: var(--glow);
 }
 
 .logo-hidden {
   visibility: hidden;
 }
 
-.themes {
+.header-right {
   display: flex;
-  gap: 10px;
-}
-
-.theme-dot {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  border: 2px solid transparent;
-  transition: transform 0.15s ease;
-}
-
-.theme-dot:hover {
-  transform: scale(1.25);
-}
-
-.theme-dot.active {
-  border-color: var(--text);
+  align-items: center;
+  gap: 18px;
 }
 
 .main {
@@ -148,8 +146,8 @@ button {
   font: inherit;
   color: var(--text);
   background: var(--surface);
-  border: 2px solid transparent;
-  border-radius: 8px;
+  border: 2px solid var(--edge);
+  border-radius: var(--radius);
   padding: 10px 14px;
   outline: none;
   transition: border-color 0.15s ease;
@@ -167,7 +165,8 @@ button {
   background: var(--accent);
   color: var(--bg);
   font-weight: 700;
-  border-radius: 8px;
+  border-radius: var(--radius);
+  box-shadow: var(--lift);
   padding: 10px 14px;
   transition: transform 0.1s ease, opacity 0.15s ease;
 }
@@ -275,7 +274,7 @@ button {
 
 .code {
   background: var(--surface);
-  border-radius: 8px;
+  border-radius: var(--radius);
   padding: 16px 20px;
   overflow-x: auto;
   font-size: 0.95rem;
@@ -291,8 +290,9 @@ button {
 .option {
   text-align: left;
   background: var(--surface);
-  border: 2px solid transparent;
-  border-radius: 8px;
+  border: 2px solid var(--edge);
+  border-radius: var(--radius);
+  box-shadow: var(--lift);
   padding: 12px 14px;
   display: flex;
   gap: 12px;
@@ -357,14 +357,9 @@ button {
 }
 
 /* ---------- Effects ---------- */
-.themes {
-  align-items: center;
-}
-
 .fx-toggle {
   color: var(--sub);
   font-size: 0.75rem;
-  margin-right: 6px;
   transition: color 0.15s ease;
 }
 
@@ -429,7 +424,7 @@ button {
   margin-left: 14px;
   padding: 2px 8px;
   border: 2px solid var(--accent);
-  border-radius: 6px;
+  border-radius: max(0px, calc(var(--radius) - 2px));
   color: var(--accent);
   font-size: 0.8rem;
   text-transform: uppercase;
@@ -565,7 +560,7 @@ html[data-fx="off"] .timer {
   gap: 6px;
   padding: 12px;
   background: var(--surface);
-  border-radius: 8px;
+  border-radius: var(--radius);
 }
 
 .bar {
@@ -720,8 +715,9 @@ html[data-fx="off"] .dice {
 .mode {
   text-align: left;
   background: var(--surface);
-  border: 2px solid transparent;
-  border-radius: 10px;
+  border: 2px solid var(--edge);
+  border-radius: calc(var(--radius) + 2px);
+  box-shadow: var(--lift);
   padding: 18px 20px;
   display: grid;
   grid-template-columns: auto 1fr;
@@ -776,8 +772,8 @@ html[data-fx="off"] .dice {
   font-size: 0.85rem;
   color: var(--text);
   background: var(--surface);
-  border: 2px solid transparent;
-  border-radius: 8px;
+  border: 2px solid var(--edge);
+  border-radius: var(--radius);
   padding: 10px 14px;
   outline: none;
   flex: 1;
@@ -1090,7 +1086,7 @@ html[data-fx="off"] .rating-ticker {
   gap: 10px;
   padding: 12px 12px 6px;
   background: var(--surface);
-  border-radius: 8px;
+  border-radius: var(--radius);
 }
 
 .duel-round {
@@ -1169,7 +1165,7 @@ html[data-fx="off"] .hot-streak {
   color: var(--sub);
   font-size: 0.85rem;
   background: var(--surface);
-  border-radius: 8px;
+  border-radius: var(--radius);
   padding: 10px 14px;
 }
 
@@ -1186,8 +1182,8 @@ html[data-fx="off"] .hot-streak {
   gap: 12px;
   text-align: left;
   padding: 10px 14px;
-  border-radius: 8px;
-  border: 2px solid transparent;
+  border-radius: var(--radius);
+  border: 2px solid var(--edge);
   transition: background 0.15s ease, border-color 0.15s ease;
 }
 
@@ -1269,7 +1265,7 @@ html[data-fx="off"] .hot-streak {
   grid-template-columns: auto 1fr;
   gap: 8px;
   background: var(--surface);
-  border-radius: 8px;
+  border-radius: var(--radius);
   padding: 14px 18px 14px 10px;
 }
 
@@ -1353,14 +1349,14 @@ html[data-fx="off"] .hot-streak {
   gap: 12px;
   padding: 8px 12px;
   background: var(--surface);
-  border-radius: 8px;
+  border-radius: var(--radius);
   font-size: 0.9rem;
 }
 
 .result-badge {
   width: 24px;
   height: 24px;
-  border-radius: 6px;
+  border-radius: max(0px, calc(var(--radius) - 2px));
   display: grid;
   place-items: center;
   font-weight: 700;
@@ -1581,6 +1577,441 @@ html[data-fx="off"] .landing-hint {
 
   .landing-tagline,
   .landing-hint {
+    transition: none;
+  }
+}
+
+/* ---------- More themes: these change the feel, not just the colors ---------- */
+[data-theme="neon"] {
+  --bg: #0d0221;
+  --surface: #1c0b3d;
+  --text: #f3e8ff;
+  --sub: #a08cc8;
+  --accent: #ff2fd0;
+  --correct: #2de2e6;
+  --wrong: #ff3864;
+  --radius: 6px;
+  --edge: rgba(255, 47, 208, 0.18);
+  --glow: 0 0 6px rgba(255, 47, 208, 0.8), 0 0 18px rgba(255, 47, 208, 0.45);
+  --lift: 0 0 14px rgba(255, 47, 208, 0.18);
+}
+
+[data-theme="terminal"] {
+  --bg: #030a04;
+  --surface: #0a170c;
+  --text: #4dff88;
+  --sub: #2c9a52;
+  --accent: #c6ff3d;
+  --correct: #9dff5c;
+  --wrong: #ff5f56;
+  --radius: 0px;
+  --edge: rgba(77, 255, 136, 0.22);
+  --glow: 0 0 6px rgba(198, 255, 61, 0.7);
+}
+
+[data-theme="sunset"] {
+  --bg: #2b1a3d;
+  --surface: #3e2249;
+  --text: #ffeede;
+  --sub: #c79fa4;
+  --accent: #ffb36b;
+  --correct: #8fe3b0;
+  --wrong: #ff6b8a;
+  --radius: 14px;
+  --lift: 0 8px 24px rgba(20, 5, 25, 0.35);
+}
+
+[data-theme="contrast"] {
+  --bg: #000000;
+  --surface: #111111;
+  --text: #ffffff;
+  --sub: #c8c8c8;
+  --accent: #ffd400;
+  --correct: #00e676;
+  --wrong: #ff5252;
+  --edge: #5c5c5c;
+}
+
+/* Bigger text for projectors and bright rooms. */
+html[data-theme="contrast"] {
+  font-size: 112.5%;
+}
+
+/* Terminal: everything glows a little, like an old phosphor screen. */
+[data-theme="terminal"] body {
+  text-shadow: 0 0 3px rgba(77, 255, 136, 0.45);
+}
+
+/* Terminal's cursor is a chunky block. */
+[data-theme="terminal"] .caret {
+  width: 0.55em;
+  border-radius: 0;
+  opacity: 0.9;
+}
+
+/* Sunset buttons are pills. */
+[data-theme="sunset"] .btn-primary {
+  border-radius: 999px;
+}
+
+/* Neon: the big names glow too. */
+[data-theme="neon"] .mode-name,
+[data-theme="neon"] .typed-logo {
+  text-shadow: 0 0 10px rgba(243, 232, 255, 0.25);
+}
+
+/* ---------- Theme scenery ---------- */
+.backdrop,
+.overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  display: none;
+}
+
+.backdrop {
+  z-index: 0;
+}
+
+.overlay {
+  z-index: 60; /* above everything: it's the glass of the screen */
+}
+
+/* Neon: a glowing horizon with a grid floor rolling towards you. */
+[data-theme="neon"] .backdrop {
+  display: block;
+  overflow: hidden;
+  background: radial-gradient(ellipse 70% 30% at 50% 100%, rgba(255, 47, 208, 0.22), transparent 70%);
+}
+
+[data-theme="neon"] .backdrop::after {
+  content: "";
+  position: absolute;
+  left: -50%;
+  right: -50%;
+  bottom: 0;
+  height: 45vh;
+  background-image:
+    linear-gradient(rgba(45, 226, 230, 0.35) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(45, 226, 230, 0.35) 1px, transparent 1px);
+  background-size: 48px 48px;
+  transform: perspective(320px) rotateX(62deg);
+  transform-origin: bottom;
+  mask-image: linear-gradient(to top, black, transparent 85%);
+  opacity: 0.45;
+  animation: grid-roll 2.4s linear infinite;
+}
+
+@keyframes grid-roll {
+  to { background-position: 0 48px; }
+}
+
+/* Sunset: a warm gradient sky with a low sun. */
+[data-theme="sunset"] .backdrop {
+  display: block;
+  background:
+    radial-gradient(circle at 85% 105%, rgba(255, 179, 107, 0.35), transparent 40%),
+    linear-gradient(165deg, #2b1a3d 0%, #4a2148 55%, #7a3b4a 100%);
+}
+
+/* Terminal: scanlines and a dark vignette on the "glass". */
+[data-theme="terminal"] .overlay {
+  display: block;
+  background:
+    repeating-linear-gradient(to bottom, transparent 0 2px, rgba(0, 0, 0, 0.22) 2px 3px),
+    radial-gradient(ellipse at center, transparent 60%, rgba(0, 0, 0, 0.45) 100%);
+}
+
+html[data-fx="off"] .backdrop::after {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .backdrop::after {
+    animation: none;
+  }
+}
+
+/* ---------- Theme picker ---------- */
+.theme-picker {
+  position: relative;
+}
+
+.theme-trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--sub);
+  font-size: 0.8rem;
+  transition: color 0.15s ease;
+}
+
+.theme-trigger:hover,
+.theme-trigger[aria-expanded="true"] {
+  color: var(--text);
+}
+
+.theme-trigger-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.chevron {
+  display: inline-block;
+  transition: transform 0.2s ease;
+}
+
+.theme-trigger[aria-expanded="true"] .chevron {
+  transform: rotate(180deg);
+}
+
+.theme-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 40;
+  width: min(340px, calc(100vw - 32px));
+  margin-top: 10px;
+  padding: 6px;
+  display: grid;
+  gap: 2px;
+  background: var(--surface);
+  border: 1px solid var(--edge);
+  border-radius: calc(var(--radius) + 2px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-6px);
+  transition: opacity 0.16s ease, transform 0.16s ease, visibility 0.16s;
+}
+
+/* An invisible bridge across the gap, so the mouse can travel down without closing it. */
+.theme-menu::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -12px;
+  height: 12px;
+}
+
+.theme-menu.open {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  transition-property: opacity, transform; /* become visible at once, so it can take focus */
+}
+
+.theme-option {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 12px;
+  align-items: center;
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  transition: background 0.12s ease;
+}
+
+.theme-option:hover,
+.theme-option:focus-visible {
+  background: var(--bg);
+  outline: none;
+}
+
+.theme-option.active .theme-name::after {
+  content: " ✓";
+  color: var(--accent);
+}
+
+.theme-swatch {
+  grid-row: span 2;
+  width: 46px;
+  height: 32px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  box-shadow: inset 0 0 0 1px rgba(128, 128, 128, 0.35);
+}
+
+.theme-swatch-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.theme-name {
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.theme-vibe {
+  color: var(--sub);
+  font-size: 0.75rem;
+}
+
+/* ---------- Logo menu ---------- */
+.logo-wrap {
+  position: relative;
+}
+
+.logo-button {
+  font: inherit;
+  letter-spacing: inherit;
+  display: flex;
+  align-items: baseline;
+  gap: 0;
+}
+
+/* A small arrow that slides out on hover hints that the logo opens something. */
+.logo-button::after {
+  content: "›";
+  color: var(--sub);
+  margin-left: 6px;
+  opacity: 0;
+  transform: translateX(-4px);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.logo-button:hover::after,
+.logo-button[aria-expanded="true"]::after {
+  opacity: 1;
+  transform: none;
+}
+
+.side-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 40;
+  width: 300px;
+  margin-top: 10px;
+  padding: 6px;
+  display: grid;
+  gap: 2px;
+  background: var(--surface);
+  border: 1px solid var(--edge);
+  border-radius: calc(var(--radius) + 2px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateX(-14px);
+  transition: opacity 0.18s ease, transform 0.18s ease, visibility 0.18s;
+}
+
+.side-menu::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -12px;
+  height: 12px;
+}
+
+.side-menu.open {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  transition-property: opacity, transform; /* become visible at once, so it can take focus */
+}
+
+.side-item {
+  display: grid;
+  text-align: left;
+  padding: 9px 12px;
+  border-radius: var(--radius);
+  border-left: 3px solid transparent;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.side-item:hover,
+.side-item:focus-visible {
+  background: var(--bg);
+  outline: none;
+}
+
+.side-item.current {
+  border-left-color: var(--accent);
+}
+
+.side-label {
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.side-hint {
+  color: var(--sub);
+  font-size: 0.75rem;
+}
+
+.side-confirm {
+  margin-top: 6px;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--wrong);
+  font-size: 0.8rem;
+  display: grid;
+  gap: 10px;
+}
+
+.side-confirm-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.side-scrim {
+  display: none;
+}
+
+/* Phones: a proper drawer from the left edge, with the page dimmed behind it. */
+@media (hover: none), (max-width: 600px) {
+  .side-menu {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: min(300px, 82vw);
+    margin: 0;
+    padding: 24px 10px;
+    align-content: start;
+    border-radius: 0 calc(var(--radius) + 2px) calc(var(--radius) + 2px) 0;
+    transform: translateX(-100%);
+    opacity: 1;
+  }
+
+  .side-scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 39;
+    background: rgba(0, 0, 0, 0.45);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s ease, visibility 0.2s;
+  }
+
+  .side-scrim.open {
+    opacity: 1;
+    visibility: visible;
+  }
+}
+
+html[data-fx="off"] .theme-menu,
+html[data-fx="off"] .side-menu,
+html[data-fx="off"] .side-scrim {
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .theme-menu,
+  .side-menu,
+  .side-scrim {
     transition: none;
   }
 }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type RefObject } from 'react'
 import { api, type Profile } from '../lib/api'
 import { supabase } from '../lib/supabase'
 import CodeOff from './CodeOff'
@@ -8,10 +8,13 @@ import Menu from './Menu'
 import PlayerPage from './PlayerPage'
 import PuzzleRush from './PuzzleRush'
 import Queue from './Queue'
+import type { NavState, NavTarget } from './SideMenu'
 import UsernamePicker from './UsernamePicker'
 
 type Props = {
   effects: boolean
+  navigateRef: RefObject<((target: NavTarget) => void) | null> // filled in here, used by the side menu
+  onNavState: (state: NavState | null) => void
 }
 
 type Mode =
@@ -36,12 +39,13 @@ function setMatchInUrl(code: string | null) {
 }
 
 // Loads the player's profile. New players pick a name first, then they can play.
-export default function Home({ effects }: Props) {
+export default function Home({ effects, navigateRef, onNavState }: Props) {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [mode, setMode] = useState<Mode>(initialMode)
   const [creating, setCreating] = useState(false)
   const [attempt, setAttempt] = useState(0) // bump to retry loading the profile
+  const [matchLive, setMatchLive] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -91,6 +95,39 @@ export default function Home({ effects }: Props) {
       setCreating(false)
     }
   }
+
+  // Let the side menu drive the screens.
+  useEffect(() => {
+    navigateRef.current = (target: NavTarget) => {
+      if (target === 'menu') goToMenu()
+      else if (target === 'solo') {
+        setMatchInUrl(null)
+        setMode({ kind: 'solo' })
+      } else if (target === 'ranked') findRanked()
+      else if (target === 'friend') startFriendMatch()
+      else if (target === 'leaderboard') {
+        setMatchInUrl(null)
+        setMode({ kind: 'leaderboard' })
+      } else if (profile?.username) openPlayer(profile.username)
+    }
+  })
+
+  // Tell the side menu where we are (or that there's no menu yet: no username).
+  const current: NavTarget | null =
+    mode.kind === 'queue'
+      ? 'ranked'
+      : mode.kind === 'player'
+        ? mode.username === profile?.username
+          ? 'profile'
+          : null
+        : mode.kind === 'codeoff'
+          ? null
+          : mode.kind
+  const ready = Boolean(profile?.username)
+  useEffect(() => {
+    onNavState(ready ? { current, inMatch: matchLive } : null)
+  }, [ready, current, matchLive, onNavState])
+  useEffect(() => () => onNavState(null), [onNavState])
 
   if (!profile && error) {
     return (
@@ -146,12 +183,13 @@ export default function Home({ effects }: Props) {
             effects={effects}
             onExit={goToMenu}
             onNewMatch={(rated) => (rated ? findRanked() : startFriendMatch())}
+            onLiveChange={setMatchLive}
           />
         )}
       </div>
 
       <p className="signed-in">
-        {mode.kind !== 'menu' && (
+        {mode.kind !== 'menu' && !matchLive && (
           <>
             <button className="link" onClick={goToMenu}>
               menu
