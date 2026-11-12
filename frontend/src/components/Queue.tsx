@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { wsUrl } from '../lib/api'
 import { supabase } from '../lib/supabase'
+import Loader from './Loader'
 
 type QueueMessage =
   | { type: 'queued'; rating: number; in_queue: number }
@@ -104,12 +105,7 @@ export default function Queue({ onMatched, onCancel }: Props) {
   return (
     <div className="codeoff-center">
       <h2 className="auth-title">ranked</h2>
-      <div className="radar" aria-hidden="true" />
-      <p className="waiting-dots">
-        finding an opponent<span>.</span>
-        <span>.</span>
-        <span>.</span>
-      </p>
+      <Loader label="finding an opponent" />
       <p className="queue-stats">
         {minutes}:{seconds} · {range === null ? 'any rating' : `±${range}`} · {inQueue}{' '}
         searching

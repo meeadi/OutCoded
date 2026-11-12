@@ -34,14 +34,32 @@ export const THEMES = [
   {
     id: 'sunset',
     name: 'sunset',
-    vibe: 'warm gradient, soft and rounded.',
+    vibe: 'golden hour behind the mountains.',
     swatch: { bg: 'linear-gradient(160deg, #2b1a3d, #7a3b4a)', text: '#ffeede', accent: '#ffb36b' },
   },
+    {
+    id: 'aurora',
+    name: 'aurora',
+    vibe: 'northern lights over a starry night.',
+    swatch: { bg: 'linear-gradient(180deg, #0b1a2e, #070b1a)', text: '#e6f0ff', accent: '#5cf2b0' },
+  },
   {
-    id: 'contrast',
-    name: 'high contrast',
-    vibe: 'max readability. great on projectors.',
-    swatch: { bg: '#000000', text: '#ffffff', accent: '#ffd400' },
+    id: 'lofi',
+    name: 'lofi rain',
+    vibe: 'rain on the window, lamp on, beats on.',
+    swatch: { bg: 'linear-gradient(180deg, #1d2232, #171b25)', text: '#e8e2d6', accent: '#f2b16b' },
+  },
+  {
+    id: 'sakura',
+    name: 'sakura',
+    vibe: 'cherry blossoms drifting by.',
+    swatch: { bg: '#fbf3ee', text: '#3b2a2f', accent: '#e0567f' },
+  },
+  {
+    id: 'deepsea',
+    name: 'deep sea',
+    vibe: 'bubbles, light beams, total calm.',
+    swatch: { bg: 'linear-gradient(180deg, #06324a, #031827)', text: '#dff6ff', accent: '#3ee6d8' },
   },
 ] as const
 

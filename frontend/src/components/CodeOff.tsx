@@ -6,6 +6,7 @@ import { stampFor } from '../lib/session'
 import { supabase } from '../lib/supabase'
 import MatchSummary, { type RoundSummary } from './MatchSummary'
 import QuestionCard from './QuestionCard'
+import Loader from './Loader'
 
 // ---- Messages the match server sends (see backend/app/match_room.py) ----
 type Side = { correct: boolean; timed_out: boolean; response_ms: number; points: number } | null
@@ -342,7 +343,7 @@ export default function CodeOff({ code, effects, onExit, onNewMatch, onLiveChang
     return () => window.removeEventListener('keydown', onKey)
   }, [status, locked, round, answer])
 
-  if (status === 'connecting') return <p className="tagline">connecting...</p>
+  if (status === 'connecting') return <Loader label="connecting" />
 
   if (status === 'error') {
     return (
@@ -359,11 +360,7 @@ export default function CodeOff({ code, effects, onExit, onNewMatch, onLiveChang
     return (
       <div className="codeoff-center">
         <h2 className="over-title">connection lost</h2>
-        <p className="waiting-dots">
-          reconnecting<span>.</span>
-          <span>.</span>
-          <span>.</span>
-        </p>
+        <Loader label="reconnecting" />
         <p className="picker-hint">
           the match is paused for both of you. {secondsLeft(reconnectBy, now, 30)}s to get back.
         </p>
@@ -398,7 +395,7 @@ export default function CodeOff({ code, effects, onExit, onNewMatch, onLiveChang
   }
 
   if (status === 'waiting') {
-    if (rated) return <p className="tagline">waiting for your opponent to connect...</p>
+    if (rated) return <Loader label="waiting for your opponent to connect" />
     return <Lobby code={code} onExit={onExit} />
   }
 

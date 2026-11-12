@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api, type Leaderboard as Board, type LeaderboardRow } from '../lib/api'
 import { formatRating } from '../lib/rating'
+import Loader from './Loader'
 
 type Props = {
   me: string
@@ -25,7 +26,7 @@ export default function Leaderboard({ me, onOpenPlayer }: Props) {
   }, [])
 
   if (error) return <p className="auth-message">{error}</p>
-  if (!board) return <p className="tagline">loading...</p>
+  if (!board) return <Loader />
 
   const youInList = board.players.some((p) => p.username === me)
   const toGo = board.placement_matches - board.your_games

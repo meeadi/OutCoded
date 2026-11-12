@@ -5,6 +5,7 @@ import { celebrate, punish, sparkle, victory } from '../lib/effects'
 import { currentStreak, SESSION_LENGTH, stampFor, type Round } from '../lib/session'
 import QuestionCard from './QuestionCard'
 import Results from './Results'
+import Loader from './Loader'
 
 type Phase = 'loading' | 'question' | 'submitting' | 'result' | 'summary' | 'error'
 
@@ -151,7 +152,7 @@ export default function PuzzleRush({ effects }: Props) {
   }
 
   if (!current || phase === 'loading') {
-    return <p className="tagline">loading...</p>
+    return <Loader />
   }
 
   const { question } = current

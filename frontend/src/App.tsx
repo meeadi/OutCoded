@@ -3,6 +3,7 @@ import AuthForm from './components/AuthForm'
 import Home from './components/Home'
 import Landing from './components/Landing'
 import NewPasswordForm from './components/NewPasswordForm'
+import Scenery from './components/Scenery'
 import SideMenu, { type NavState, type NavTarget } from './components/SideMenu'
 import ThemePicker from './components/ThemePicker'
 import { canHover, useHoverOpen } from './hooks/useHoverOpen'
@@ -72,7 +73,7 @@ export default function App() {
       {/* Outside .app on purpose: .app shakes, and a shaking parent would trap the flash. */}
       <div className="flash" aria-hidden="true" />
       {/* Theme scenery: behind the page (neon's grid, sunset's glow) and in front of it (terminal's scanlines). */}
-      <div className="backdrop" aria-hidden="true" />
+      <Scenery />
       <div className="overlay" aria-hidden="true" />
       <div className="app">
         <header className="header">

@@ -959,32 +959,27 @@ html[data-fx="off"] .waiting-dots span {
   margin-left: 8px;
 }
 
-.radar {
-  width: 72px;
-  height: 72px;
-  border-radius: 50%;
-  border: 2px solid var(--accent);
-  position: relative;
-  margin: 8px 0;
+/* The typing-logo loader (Loader.tsx), used for every wait. */
+.loader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 3vh 0;
+  animation: fade-in 0.25s ease 0.15s backwards; /* quick loads never flash it */
 }
 
-.radar::before,
-.radar::after {
-  content: '';
-  position: absolute;
-  inset: -2px;
-  border-radius: 50%;
-  border: 2px solid var(--accent);
-  animation: ping 1.8s ease-out infinite;
+.loader-logo {
+  font-size: 2rem;
 }
 
-.radar::after {
-  animation-delay: 0.9s;
+.loader-label {
+  color: var(--sub);
+  font-size: 0.85rem;
 }
 
-@keyframes ping {
-  from { transform: scale(1); opacity: 0.8; }
-  to { transform: scale(2.2); opacity: 0; }
+@keyframes fade-in {
+  from { opacity: 0; }
 }
 
 .queue-stats {
@@ -1632,20 +1627,52 @@ html[data-fx="off"] .landing-hint {
   --lift: 0 8px 24px rgba(20, 5, 25, 0.35);
 }
 
-[data-theme="contrast"] {
-  --bg: #000000;
-  --surface: #111111;
-  --text: #ffffff;
-  --sub: #c8c8c8;
-  --accent: #ffd400;
-  --correct: #00e676;
-  --wrong: #ff5252;
-  --edge: #5c5c5c;
+[data-theme="aurora"] {
+  --bg: #070b1a;
+  --surface: #111833;
+  --text: #e6f0ff;
+  --sub: #8494b8;
+  --accent: #5cf2b0;
+  --correct: #8ef0a8;
+  --wrong: #ff6b8b;
+  --edge: rgba(92, 242, 176, 0.14);
+  --glow: 0 0 8px rgba(92, 242, 176, 0.6);
 }
 
-/* Bigger text for projectors and bright rooms. */
-html[data-theme="contrast"] {
-  font-size: 112.5%;
+[data-theme="lofi"] {
+  --bg: #1b1f2a;
+  --surface: #252a38;
+  --text: #e8e2d6;
+  --sub: #8f8a80;
+  --accent: #f2b16b;
+  --correct: #9ad48a;
+  --wrong: #e8737a;
+  --radius: 10px;
+  --lift: 0 6px 18px rgba(0, 0, 0, 0.25);
+}
+
+[data-theme="sakura"] {
+  --bg: #fbf3ee;
+  --surface: #ffffff;
+  --text: #3b2a2f;
+  --sub: #9a7f86;
+  --accent: #e0567f;
+  --correct: #2f9a66;
+  --wrong: #d64545;
+  --radius: 12px;
+  --lift: 0 6px 18px rgba(160, 80, 100, 0.12);
+}
+
+[data-theme="deepsea"] {
+  --bg: #031827;
+  --surface: #08263a;
+  --text: #dff6ff;
+  --sub: #6f9db3;
+  --accent: #3ee6d8;
+  --correct: #58f0a0;
+  --wrong: #ff6f7d;
+  --edge: rgba(62, 230, 216, 0.14);
+  --glow: 0 0 8px rgba(62, 230, 216, 0.55);
 }
 
 /* Terminal: everything glows a little, like an old phosphor screen. */
@@ -1677,21 +1704,19 @@ html[data-theme="contrast"] {
   position: fixed;
   inset: 0;
   pointer-events: none;
-  display: none;
 }
 
 .backdrop {
   z-index: 0;
+  overflow: hidden;
 }
 
 .overlay {
-  z-index: 60; /* above everything: it's the glass of the screen */
+  display: none;
 }
 
 /* Neon: a glowing horizon with a grid floor rolling towards you. */
 [data-theme="neon"] .backdrop {
-  display: block;
-  overflow: hidden;
   background: radial-gradient(ellipse 70% 30% at 50% 100%, rgba(255, 47, 208, 0.22), transparent 70%);
 }
 
@@ -1717,12 +1742,21 @@ html[data-theme="contrast"] {
   to { background-position: 0 48px; }
 }
 
-/* Sunset: a warm gradient sky with a low sun. */
+/* Skies for the animated themes; the moving parts are in "Animated scenery" below. */
 [data-theme="sunset"] .backdrop {
-  display: block;
-  background:
-    radial-gradient(circle at 85% 105%, rgba(255, 179, 107, 0.35), transparent 40%),
-    linear-gradient(165deg, #2b1a3d 0%, #4a2148 55%, #7a3b4a 100%);
+  background: linear-gradient(180deg, #2b1a3d 0%, #5a2550 45%, #b2545a 78%, #f0956a 100%);
+}
+
+[data-theme="aurora"] .backdrop {
+  background: linear-gradient(180deg, #0b1a2e 0%, #070b1a 60%);
+}
+
+[data-theme="lofi"] .backdrop {
+  background: linear-gradient(180deg, #1d2232 0%, #171b25 100%);
+}
+
+[data-theme="deepsea"] .backdrop {
+  background: linear-gradient(180deg, #06324a 0%, #031827 45%, #010b13 100%);
 }
 
 /* Terminal: scanlines and a dark vignette on the "glass". */
@@ -2048,4 +2082,269 @@ html[data-fx="off"] .opp-away {
 
 @media (prefers-reduced-motion: reduce) {
   .opp-away { animation: none; }
+}
+
+/* ---------- Animated scenery (see Scenery.tsx) ---------- */
+.scene {
+  position: absolute;
+  inset: 0;
+  display: none;
+  overflow: hidden;
+}
+
+[data-theme="sunset"] .scene-sunset,
+[data-theme="aurora"] .scene-aurora,
+[data-theme="lofi"] .scene-lofi,
+[data-theme="sakura"] .scene-sakura,
+[data-theme="deepsea"] .scene-deepsea {
+  display: block;
+}
+
+/* A particle: the outer span travels, the inner one is what you see. */
+.p {
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+}
+
+.p > span {
+  display: block;
+}
+
+@keyframes fall {
+  to { transform: translateY(125vh); }
+}
+
+@keyframes rise {
+  to { transform: translateY(-125vh); }
+}
+
+@keyframes rain {
+  to { transform: translate(-26vh, 125vh); }
+}
+
+@keyframes sway {
+  from { transform: translateX(calc(var(--sway) * -1)) rotate(-25deg); }
+  to { transform: translateX(var(--sway)) rotate(40deg); }
+}
+
+@keyframes wobble {
+  from { transform: translateX(calc(var(--sway) * -1)); }
+  to { transform: translateX(var(--sway)); }
+}
+
+@keyframes twinkle {
+  0%, 100% { opacity: 0.2; }
+  50% { opacity: 1; }
+}
+
+@keyframes drift {
+  to { transform: translateX(170vw); }
+}
+
+/* Sunset: a big soft sun sinking very slowly behind two mountain ridges. */
+.sun {
+  position: absolute;
+  left: 68%;
+  bottom: 12vh;
+  width: 30vmin;
+  height: 30vmin;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff1c9 0%, #ffc27a 45%, #ff8a5c 68%, transparent 71%);
+  box-shadow: 0 0 90px 35px rgba(255, 160, 90, 0.3);
+  animation: sun-sink 80s ease-in-out infinite alternate;
+}
+
+@keyframes sun-sink {
+  to { transform: translateY(10vh); }
+}
+
+.cloud {
+  left: -40vw;
+  top: calc(var(--y) * 0.45);
+  animation: drift var(--d) linear var(--delay) infinite;
+}
+
+.cloud > span {
+  width: var(--s);
+  height: calc(var(--s) * 0.35);
+  border-radius: 50%;
+  background: rgba(255, 196, 170, 0.16);
+  filter: blur(16px);
+}
+
+.ridge {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+
+.ridge.far {
+  height: 28vh;
+  background: #6b2f55;
+  opacity: 0.8;
+  clip-path: polygon(0 55%, 9% 38%, 18% 50%, 30% 26%, 42% 46%, 55% 20%, 68% 44%, 80% 28%, 92% 48%, 100% 36%, 100% 100%, 0 100%);
+}
+
+.ridge.near {
+  height: 17vh;
+  background: #2a1430;
+  clip-path: polygon(0 40%, 12% 62%, 24% 34%, 37% 58%, 50% 30%, 63% 55%, 76% 36%, 88% 60%, 100% 42%, 100% 100%, 0 100%);
+}
+
+/* Aurora: slow light ribbons waving over twinkling stars. */
+.star {
+  top: calc(var(--y) * 0.65);
+}
+
+.star > span {
+  width: var(--s);
+  height: var(--s);
+  border-radius: 50%;
+  background: #ffffff;
+  animation: twinkle var(--d) ease-in-out var(--delay) infinite;
+}
+
+.ribbon {
+  position: absolute;
+  left: -25%;
+  width: 150%;
+  height: 34vh;
+  border-radius: 50%;
+  filter: blur(34px);
+  opacity: 0.32;
+  mix-blend-mode: screen;
+  animation: aurora 17s ease-in-out infinite alternate;
+}
+
+.ribbon.r1 {
+  top: 2vh;
+  background: linear-gradient(90deg, transparent 5%, #5cf2b0 35%, #7a6cff 65%, transparent 95%);
+}
+
+.ribbon.r2 {
+  top: 14vh;
+  height: 24vh;
+  background: linear-gradient(90deg, transparent 10%, #3ee6d8 40%, #c56cff 70%, transparent 95%);
+  animation-duration: 23s;
+  animation-direction: alternate-reverse;
+}
+
+.ribbon.r3 {
+  top: 24vh;
+  height: 16vh;
+  opacity: 0.2;
+  background: linear-gradient(90deg, transparent 20%, #8ef0a8 50%, transparent 85%);
+  animation-duration: 29s;
+}
+
+@keyframes aurora {
+  from { transform: translateX(-10%) skewX(-12deg) scaleY(0.85); }
+  to { transform: translateX(10%) skewX(10deg) scaleY(1.25); }
+}
+
+/* Lofi rain: slanted rain, a few drops sliding down the glass, a warm lamp. */
+.lamp {
+  position: absolute;
+  right: -12vmax;
+  bottom: -12vmax;
+  width: 65vmax;
+  height: 65vmax;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(242, 177, 107, 0.2), transparent 62%);
+  animation: lamp 7s ease-in-out infinite;
+}
+
+@keyframes lamp {
+  50% { opacity: 0.7; }
+}
+
+.rain {
+  top: -15vh;
+  animation: rain var(--d) linear var(--delay) infinite;
+}
+
+.rain > span {
+  width: 1px;
+  height: var(--s);
+  background: linear-gradient(transparent, rgba(190, 210, 240, 0.5));
+  transform: rotate(12deg);
+}
+
+.trickle {
+  top: -5vh;
+  animation: fall var(--d) cubic-bezier(0.5, 0, 0.9, 0.6) var(--delay) infinite;
+}
+
+.trickle > span {
+  width: var(--s);
+  height: calc(var(--s) * 1.4);
+  border-radius: 50% 50% 50% 50% / 40% 40% 60% 60%;
+  background: radial-gradient(circle at 35% 35%, rgba(255, 255, 255, 0.45), rgba(170, 190, 220, 0.12));
+}
+
+/* Sakura: petals tumbling down and drifting sideways. */
+.petal {
+  top: -6vh;
+  animation: fall var(--d) linear var(--delay) infinite;
+}
+
+.petal > span {
+  width: var(--s);
+  height: calc(var(--s) * 0.7);
+  border-radius: 100% 0 100% 0;
+  background: linear-gradient(135deg, #ffd9e4, #f28fb0);
+  opacity: 0.85;
+  animation: sway calc(var(--d) / 4) ease-in-out var(--delay) infinite alternate;
+}
+
+/* Deep sea: light beams swaying from the surface, bubbles rising. */
+.beam {
+  position: absolute;
+  top: -12vh;
+  width: 14vw;
+  height: 85vh;
+  background: linear-gradient(180deg, rgba(130, 235, 255, 0.16), transparent 85%);
+  clip-path: polygon(42% 0, 58% 0, 100% 100%, 0 100%);
+  filter: blur(6px);
+  transform-origin: top center;
+  animation: beam 10s ease-in-out infinite alternate;
+}
+
+.beam.b1 { left: 8%; }
+.beam.b2 { left: 32%; animation-duration: 13s; animation-direction: alternate-reverse; }
+.beam.b3 { left: 58%; animation-duration: 11s; }
+.beam.b4 { left: 80%; animation-duration: 15s; animation-direction: alternate-reverse; opacity: 0.7; }
+
+@keyframes beam {
+  from { transform: rotate(-7deg); }
+  to { transform: rotate(7deg); }
+}
+
+.bubble {
+  top: 105vh;
+  animation: rise var(--d) linear var(--delay) infinite;
+}
+
+.bubble > span {
+  width: var(--s);
+  height: var(--s);
+  border-radius: 50%;
+  border: 1px solid rgba(160, 240, 255, 0.45);
+  background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.35), transparent 60%);
+  animation: wobble 2.4s ease-in-out var(--delay) infinite alternate;
+}
+
+/* fx off or "reduce motion": the scenery stays, frozen mid-scene. */
+html[data-fx="off"] .scene *,
+html[data-fx="off"] .scene *::before,
+html[data-fx="off"] .scene *::after {
+  animation-play-state: paused !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scene * {
+    animation-play-state: paused !important;
+  }
 }

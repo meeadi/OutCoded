@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { api, type PlayerProfile } from '../lib/api'
 import { formatRating } from '../lib/rating'
 import RatingChart from './RatingChart'
+import Loader from './Loader'
 
 type Props = {
   username: string
@@ -33,7 +34,7 @@ export default function PlayerPage({ username, onOpenPlayer }: Props) {
   }, [username])
 
   if (error) return <p className="auth-message">{error}</p>
-  if (!player) return <p className="tagline">loading...</p>
+  if (!player) return <Loader />
 
   const { record } = player
   const winRate = record.games ? Math.round((record.wins / record.games) * 100) : null
