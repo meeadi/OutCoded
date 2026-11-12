@@ -2,12 +2,14 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import AuthForm from './components/AuthForm'
 import Home from './components/Home'
 import Landing from './components/Landing'
+import NewPasswordForm from './components/NewPasswordForm'
 import SideMenu, { type NavState, type NavTarget } from './components/SideMenu'
 import ThemePicker from './components/ThemePicker'
 import { canHover, useHoverOpen } from './hooks/useHoverOpen'
 import { useSession } from './hooks/useSession'
 import { wakeServer } from './lib/api'
 import { prefersReducedMotion } from './lib/effects'
+import { authLinkFailed } from './lib/supabase'
 import { isThemeId, paintTheme, type ThemeId } from './lib/themes'
 
 function loadTheme(): ThemeId {
@@ -29,7 +31,7 @@ export default function App() {
   const [theme, setTheme] = useState<ThemeId>(loadTheme)
   const [effects, setEffects] = useState(loadEffects)
   const [entered, setEntered] = useState(loadEntered)
-  const { session, loading } = useSession()
+  const { session, loading, recovering, finishRecovery } = useSession()
   const sideMenu = useHoverOpen()
   // Home does the navigating (it owns the screens); the menu up here just asks.
   const navigateRef = useRef<((target: NavTarget) => void) | null>(null)
@@ -44,7 +46,15 @@ export default function App() {
   // Start waking the backend while people watch the intro or type their password.
   useEffect(() => wakeServer(), [])
 
-  const page = loading ? 'loading' : session ? 'home' : entered ? 'auth' : 'landing'
+  const page = loading
+    ? 'loading'
+    : session
+      ? recovering
+        ? 'reset' // opened a password reset link: choose a new password first
+        : 'home'
+      : entered || authLinkFailed
+        ? 'auth'
+        : 'landing'
 
   // Apply the theme to <html> and remember it for next time.
   useEffect(() => {
@@ -119,7 +129,16 @@ export default function App() {
                 onNavState={setNavState}
               />
             )}
-            {page === 'auth' && <AuthForm />}
+            {page === 'auth' && (
+              <AuthForm
+                notice={
+                  authLinkFailed
+                    ? 'that email link has expired or was already used. sign in, or ask for a new one.'
+                    : null
+                }
+              />
+            )}
+            {page === 'reset' && <NewPasswordForm onDone={finishRecovery} />}
             {page === 'landing' && <Landing animate={effects} onEnter={enter} />}
           </div>
         </main>
