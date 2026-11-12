@@ -2026,3 +2026,26 @@ html[data-fx="off"] .side-scrim {
     transition: none;
   }
 }
+
+/* ---------- Reconnecting ---------- */
+.opp-away {
+  align-self: center;
+  font-size: 0.8rem;
+  color: var(--wrong);
+  border: 1px solid var(--wrong);
+  border-radius: 999px;
+  padding: 4px 12px;
+  animation: away-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes away-pulse {
+  50% { opacity: 0.55; }
+}
+
+html[data-fx="off"] .opp-away {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .opp-away { animation: none; }
+}

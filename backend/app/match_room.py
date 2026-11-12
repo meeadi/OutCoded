@@ -10,15 +10,27 @@ Protocol (all messages are JSON with a "type"):
     {"type": "auth", "token": "..."}           first message, always
     {"type": "answer", "choice": 0-3 | null,   null = my timer ran out
      "away_ms": int | null}                    time the tab was out of focus
+    {"type": "forfeit"}                        I'm leaving on purpose
 
   server -> browser
-    waiting            you're in, waiting for an opponent (says whether it's ranked)
-    start              both players are here; first round in a few seconds
-    round              a question (options shuffled per player, no answer)
-    opponent_answered  your opponent locked in (but not what they picked)
-    round_result       both answers, points, running score, the solution
-    match_over         final result
-    error              something went wrong; the socket closes after this
+    waiting               you're in, waiting for an opponent (says whether it's ranked)
+    start                 both players are here; first round in a few seconds
+    round                 a question (options shuffled per player, no answer)
+    opponent_answered     your opponent locked in (but not what they picked)
+    round_result          both answers, points, running score, the solution
+    opponent_disconnected your opponent's connection dropped; they have reconnect_s to return
+    opponent_reconnected  they're back
+    round_voided          the round was interrupted, so it doesn't count (score rolled back)
+    resume                you reconnected: here's the match so far
+    resuming              everyone's here again; the next round starts in a few seconds
+    ping                  heartbeat, so a dead connection gets noticed
+    match_over            final result
+    error                 something went wrong; the socket closes after this
+
+Dropped connections: the match pauses and the player gets RECONNECT_S to come
+back. A round that was cut off is thrown away and replayed with a new question
+(it's been on screen, so it could have been looked up), but only once per
+player per match, so pulling your own cable can't fish for easier questions.
 """
 
 import asyncio
@@ -41,6 +53,10 @@ START_DELAY_S = 3
 BETWEEN_ROUNDS_S = 5
 FINAL_PAUSE_S = 3  # time to see the last round's result before the winner is announced
 NO_SHOW_S = 20  # a ranked match is cancelled if the opponent hasn't connected by then
+RECONNECT_S = 30  # how long a dropped player has to come back before forfeiting
+RESUME_DELAY_S = 3  # breather once everyone's back, before the next round
+HEARTBEAT_S = 10
+REPLAYS_PER_PLAYER = 1  # interrupted rounds a player can have replayed per match
 
 
 class RoomError(Exception):
@@ -55,6 +71,9 @@ class Player:
     score: int = 0
     attempt_id: UUID | None = None
     answer: ScoredAnswer | None = None
+    connected: bool = True
+    replays_left: int = REPLAYS_PER_PLAYER
+    forfeit_task: asyncio.Task | None = None
 
 
 class MatchRoom:
@@ -80,7 +99,14 @@ class MatchRoom:
         self.round_done = asyncio.Event()
         self.task: asyncio.Task | None = None
         self.no_show_task: asyncio.Task | None = None
+        self.heartbeat_task: asyncio.Task | None = None
         self.finished = False
+        self.completed = 0  # rounds that counted
+        self.used: list[UUID] = []  # questions already shown in this match
+        self.in_round = False
+        self.round_voided = False
+        self.everyone_here = asyncio.Event()  # cleared while someone is disconnected
+        self.history: list[dict[UUID, dict | None]] = []  # each counted round's answers
 
     @property
     def started(self) -> bool:
@@ -103,11 +129,14 @@ class MatchRoom:
 
             existing = self.players.get(user_id)
             if existing:
-                if self.started:
-                    raise RoomError("You're already in this match in another tab.")
-                # Same player opened the link again before the match began: use the new tab.
-                await _safe_close(existing.socket)
+                # The newest connection wins: a second tab, or a phone that switched
+                # networks before the server noticed the old connection had died.
+                if existing.connected:
+                    await _safe_close(existing.socket)
                 existing.socket = socket
+                if self.started:
+                    await self._reconnected(existing)
+                    return
             elif len(self.players) >= 2:
                 raise RoomError("This match is full.")
             else:
@@ -118,11 +147,13 @@ class MatchRoom:
             if len(self.players) == 2 and not self.started:
                 if self.no_show_task:
                     self.no_show_task.cancel()
+                self.everyone_here.set()
                 self.task = asyncio.create_task(self._run())
             elif self.rated and self.no_show_task is None:
                 self.no_show_task = asyncio.create_task(self._cancel_if_no_show())
 
     async def leave(self, user_id: UUID, socket: WebSocket) -> None:
+        """The connection closed. Mid-match that's not a forfeit yet: they get time to come back."""
         async with self.lock:
             player = self.players.get(user_id)
             if player is None or player.socket is not socket or self.finished:
@@ -132,11 +163,89 @@ class MatchRoom:
                 if not self.players:
                     registry.forget(self.code)
                 return
+            if not player.connected:
+                return
 
-        # Left mid-match: the other player wins by forfeit.
+            player.connected = False
+            self.everyone_here.clear()
+
+            voided = False
+            if self.in_round and any(p.answer is None for p in self.players.values()):
+                if player.replays_left > 0:
+                    # Throw this round away; it gets replayed with a new question.
+                    player.replays_left -= 1
+                    self.round_voided = voided = True
+                    self.round_done.set()
+                elif player.answer is None:
+                    # No replays left: this round counts as a miss for them.
+                    await self._score(player, None)
+                    if all(p.answer is not None for p in self.players.values()):
+                        self.round_done.set()
+
+            opponent = self._opponent(player)
+            if opponent and opponent.connected:
+                await _send(
+                    opponent.socket,
+                    {
+                        "type": "opponent_disconnected",
+                        "reconnect_s": RECONNECT_S,
+                        "round_voided": voided,
+                    },
+                )
+            player.forfeit_task = asyncio.create_task(self._forfeit_if_gone(player))
+
+    async def forfeit(self, user_id: UUID) -> None:
+        """Left on purpose (e.g. went back to the menu): the other player wins right away."""
+        async with self.lock:
+            if user_id not in self.players or not self.started or self.finished:
+                return
+        await self._end_by_forfeit(user_id, reason="left")
+
+    async def _forfeit_if_gone(self, player: Player) -> None:
+        await asyncio.sleep(RECONNECT_S)
+        async with self.lock:
+            if self.finished or player.connected:
+                return
+        await self._end_by_forfeit(player.id, reason="disconnected")
+
+    async def _end_by_forfeit(self, user_id: UUID, reason: str) -> None:
         if self.task and self.task is not asyncio.current_task():
             self.task.cancel()
-        await self._finish(forfeited_by=user_id)
+        await self._finish(forfeited_by=user_id, reason=reason)
+
+    async def _reconnected(self, player: Player) -> None:
+        """Called with the lock held, when a dropped player comes back."""
+        was_away = not player.connected
+        player.connected = True
+        if player.forfeit_task:
+            player.forfeit_task.cancel()
+            player.forfeit_task = None
+
+        opponent = self._opponent(player)
+        await _send(
+            player.socket,
+            {
+                "type": "resume",
+                "opponent": opponent.username if opponent else None,
+                "rated": self.rated,
+                "rounds": ROUNDS,
+                "completed": self.completed,
+                "score": {"you": player.score, "opponent": opponent.score if opponent else 0},
+                "history": [
+                    {
+                        "round": i + 1,
+                        "you": r.get(player.id),
+                        "opponent": r.get(opponent.id) if opponent else None,
+                    }
+                    for i, r in enumerate(self.history)
+                ],
+                "opponent_connected": bool(opponent and opponent.connected),
+            },
+        )
+        if was_away and opponent and opponent.connected:
+            await _send(opponent.socket, {"type": "opponent_reconnected"})
+        if all(p.connected for p in self.players.values()):
+            self.everyone_here.set()
 
     async def _cancel_if_no_show(self) -> None:
         """Ranked: if the matched opponent never connects, call the match off."""
@@ -149,8 +258,8 @@ class MatchRoom:
     async def handle_answer(self, user_id: UUID, choice: object, away_ms: object = None) -> None:
         if choice is not None and (not isinstance(choice, int) or isinstance(choice, bool)):
             return  # ignore malformed messages
-        if not isinstance(away_ms, int) or isinstance(away_ms, bool) or not 0<= away_ms <= 600_000:
-            away_ms = None # drop anything odd
+        if not isinstance(away_ms, int) or isinstance(away_ms, bool) or not 0 <= away_ms <= 600_000:
+            away_ms = None  # optional and browser-reported: drop anything odd
         async with self.lock:
             player = self.players.get(user_id)
             if player is None or player.attempt_id is None or player.answer is not None:
@@ -204,12 +313,15 @@ class MatchRoom:
                         "starts_in": START_DELAY_S,
                     },
                 )
+            self.heartbeat_task = asyncio.create_task(self._heartbeat())
             await asyncio.sleep(START_DELAY_S)
 
-            used: list[UUID] = []
-            for number in range(1, ROUNDS + 1):
-                await self._play_round(number, used)
-                await asyncio.sleep(BETWEEN_ROUNDS_S if number < ROUNDS else FINAL_PAUSE_S)
+            while self.completed < ROUNDS:
+                await self._wait_for_everyone()
+                if not await self._play_round(self.completed + 1):
+                    continue  # interrupted: replay this round with a new question
+                self.completed += 1
+                await asyncio.sleep(BETWEEN_ROUNDS_S if self.completed < ROUNDS else FINAL_PAUSE_S)
 
             await self._finish(forfeited_by=None)
         except asyncio.CancelledError:
@@ -218,12 +330,30 @@ class MatchRoom:
             logger.exception("Match %s crashed", self.code)
             await self._abandon("Something broke on our side. Match cancelled.")
 
-    async def _play_round(self, number: int, used: list[UUID]) -> None:
+    async def _wait_for_everyone(self) -> None:
+        """Pause between rounds while someone is reconnecting."""
+        while not self.everyone_here.is_set():
+            await self.everyone_here.wait()
+            for player in self.players.values():
+                await _send(player.socket, {"type": "resuming", "in": RESUME_DELAY_S})
+            await asyncio.sleep(RESUME_DELAY_S)  # someone may drop again meanwhile: the loop checks
+
+    async def _heartbeat(self) -> None:
+        while True:
+            await asyncio.sleep(HEARTBEAT_S)
+            for player in list(self.players.values()):
+                if player.connected:
+                    await _send(player.socket, {"type": "ping"})
+
+    async def _play_round(self, number: int) -> bool:
+        """Play one round. Returns False if it was interrupted and doesn't count."""
+        used = self.used
         async with self.pool.acquire() as conn:
             question = await conn.fetchrow(
                 """
                 select id, format, category, language, difficulty, prompt, code,
-                       options, correct_index, explanation, time_limit_s, rating, rating_deviation
+                       options, correct_index, explanation, time_limit_s,
+                       rating, rating_deviation
                 from public.questions
                 where status = 'active' and not (id = any($1::uuid[]))
                 order by random()
@@ -238,7 +368,11 @@ class MatchRoom:
             # Every player gets their own shuffle, so "it's option 2" can't be shouted across.
             orders: dict[UUID, list[int]] = {}
             async with self.lock:
+                if not self.everyone_here.is_set():
+                    return False  # someone dropped just now; this question was never shown
                 self.round_done = asyncio.Event()
+                self.round_voided = False
+                self.in_round = True
                 for player in self.players.values():
                     orders[player.id] = game.shuffled_order(len(question["options"]))
                     player.answer = None
@@ -293,10 +427,16 @@ class MatchRoom:
             pass
 
         async with self.lock:
+            self.in_round = False
+            if self.round_voided:
+                await self._void_round(number)
+                return False
+
             for player in self.players.values():
                 if player.answer is None:
                     await self._score(player, None)  # didn't answer in time
 
+            self.history.append({p.id: _public(p.answer) for p in self.players.values()})
             for player in self.players.values():
                 opponent = self._opponent(player)
                 mine, theirs = player.answer, opponent.answer if opponent else None
@@ -315,13 +455,50 @@ class MatchRoom:
                     },
                 )
                 player.attempt_id = None
+        return True
+
+    async def _void_round(self, number: int) -> None:
+        """Called with the lock held: undo the interrupted round's points."""
+        voided_attempts = []
+        for player in self.players.values():
+            if player.answer is not None:
+                player.score -= player.answer.points
+            if player.attempt_id is not None:
+                voided_attempts.append(str(player.attempt_id))
+            player.answer = None
+            player.attempt_id = None
+        async with self.pool.acquire() as conn:
+            await log_event(
+                conn,
+                "round_voided",
+                match_id=str(self.match_id),
+                round=number,
+                attempts=voided_attempts,
+            )
+        for player in self.players.values():
+            opponent = self._opponent(player)
+            if player.connected:
+                await _send(
+                    player.socket,
+                    {
+                        "type": "round_voided",
+                        "round": number,
+                        "score": {"you": player.score, "opponent": opponent.score if opponent else 0},
+                    },
+                )
 
     # ------------------------------------------------------------------ ending
-    async def _finish(self, forfeited_by: UUID | None) -> None:
+    def _stop_background_tasks(self) -> None:
+        for task in [self.heartbeat_task, *(p.forfeit_task for p in self.players.values())]:
+            if task and task is not asyncio.current_task():
+                task.cancel()
+
+    async def _finish(self, forfeited_by: UUID | None, reason: str | None = None) -> None:
         async with self.lock:
             if self.finished:
                 return
             self.finished = True
+        self._stop_background_tasks()
 
         host = self.players.get(self.host_id)
         guest = next((p for p in self.players.values() if p.id != self.host_id), None)
@@ -382,6 +559,7 @@ class MatchRoom:
                     "type": "match_over",
                     "result": result,
                     "forfeit": forfeited_by is not None,
+                    "forfeit_reason": reason,  # "left" or "disconnected"
                     "opponent": opponent.username if opponent else None,
                     "score": {"you": player.score, "opponent": opponent.score if opponent else 0},
                     "rated": self.rated,
@@ -395,6 +573,7 @@ class MatchRoom:
             if self.finished:
                 return
             self.finished = True
+        self._stop_background_tasks()
         async with self.pool.acquire() as conn:
             await conn.execute(
                 "update public.matches set status = 'abandoned', finished_at = now() where id = $1",

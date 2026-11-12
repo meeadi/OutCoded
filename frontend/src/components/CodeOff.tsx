@@ -27,6 +27,7 @@ type OverMessage = {
   type: 'match_over'
   result: 'win' | 'loss' | 'draw'
   forfeit: boolean
+  forfeit_reason: 'left' | 'disconnected' | null
   opponent: string | null
   score: Score
   rated: boolean
@@ -40,8 +41,54 @@ type ServerMessage =
   | ResultMessage
   | OverMessage
   | { type: 'error'; message: string }
+  | { type: 'opponent_disconnected'; reconnect_s: number; round_voided: boolean }
+  | { type: 'opponent_reconnected' }
+  | { type: 'round_voided'; round: number; score: Score }
+  | {
+      type: 'resume'
+      opponent: string
+      rated: boolean
+      completed: number
+      score: Score
+      history: RoundSummary[]
+      opponent_connected: boolean
+    }
+  | { type: 'resuming'; in: number }
+  | { type: 'ping' }
 
-type Status = 'connecting' | 'waiting' | 'starting' | 'playing' | 'result' | 'over' | 'error'
+type Status =
+  | 'connecting'
+  | 'waiting'
+  | 'starting'
+  | 'playing'
+  | 'result'
+  | 'paused' // someone's reconnecting, or a round was thrown away
+  | 'reconnecting' // our own connection dropped
+  | 'over'
+  | 'error'
+
+const RECONNECT_MS = 30_000 // matches RECONNECT_S on the server
+const SILENCE_MS = 25_000 // the server pings every 10 s; this long without a word means the line is dead
+
+// The current time, ticking while `active`, for "back in 23s" style countdowns.
+function useNow(active: boolean): number {
+  const [now, setNow] = useState(0)
+  useEffect(() => {
+    if (!active) return
+    const tick = () => setNow(Date.now())
+    const id = setInterval(tick, 250)
+    const first = setTimeout(tick, 0)
+    return () => {
+      clearInterval(id)
+      clearTimeout(first)
+    }
+  }, [active])
+  return now
+}
+
+function secondsLeft(deadline: number, now: number, max: number): number {
+  return Math.max(0, Math.min(max, Math.ceil((deadline - now) / 1000)))
+}
 
 type Props = {
   code: string
@@ -53,7 +100,17 @@ type Props = {
 
 export default function CodeOff({ code, effects, onExit, onNewMatch, onLiveChange }: Props) {
   const [status, setStatus] = useState<Status>('connecting')
-  const live = status === 'starting' || status === 'playing' || status === 'result'
+  const live =
+    status === 'starting' ||
+    status === 'playing' ||
+    status === 'result' ||
+    status === 'paused' ||
+    status === 'reconnecting'
+  const liveRef = useRef(live)
+  useEffect(() => {
+    liveRef.current = live
+  }, [live])
+
   useEffect(() => {
     onLiveChange?.(live)
   }, [live, onLiveChange])
@@ -71,6 +128,10 @@ export default function CodeOff({ code, effects, onExit, onNewMatch, onLiveChang
   const [countdown, setCountdown] = useState(0)
   const [history, setHistory] = useState<RoundSummary[]>([])
   const [streakShown, setStreakShown] = useState(0)
+  const [pauseNote, setPauseNote] = useState('')
+  const [reconnectBy, setReconnectBy] = useState(0) // when our own reconnect window closes
+  const [opponentAway, setOpponentAway] = useState<{ until: number; voided: boolean } | null>(null)
+  const now = useNow(status === 'reconnecting' || opponentAway !== null)
 
   const socket = useRef<WebSocket | null>(null)
   const away = useAwayTimer()
@@ -81,19 +142,17 @@ export default function CodeOff({ code, effects, onExit, onNewMatch, onLiveChang
     effectsRef.current = effects
   }, [effects])
 
-  // Connect to the match and react to everything the server says.
+  // Connect to the match and react to everything the server says. If the
+  // connection drops mid-match, keep trying to get back in for up to 30 s.
   useEffect(() => {
-    let done = false
-    const ws = new WebSocket(wsUrl(`/ws/matches/${code}`))
-    socket.current = ws
+    let done = false // match over, an error, or we left the screen: stop reconnecting
+    let ws: WebSocket | null = null
+    let lostAt: number | null = null
+    let tries = 0
+    let retry: ReturnType<typeof setTimeout> | undefined
+    let watchdog: ReturnType<typeof setTimeout> | undefined
 
-    ws.onopen = async () => {
-      const { data } = await supabase.auth.getSession()
-      ws.send(JSON.stringify({ type: 'auth', token: data.session?.access_token ?? '' }))
-    }
-
-    ws.onmessage = (event) => {
-      const message = JSON.parse(event.data) as ServerMessage
+    function handle(message: ServerMessage) {
       switch (message.type) {
         case 'waiting':
           setRated(message.rated)
@@ -133,10 +192,48 @@ export default function CodeOff({ code, effects, onExit, onNewMatch, onLiveChang
             else sparkle()
           }
           break
+        case 'opponent_disconnected':
+          setOpponentAway({
+            until: Date.now() + message.reconnect_s * 1000,
+            voided: message.round_voided,
+          })
+          if (message.round_voided) {
+            setPauseNote("this round won't count. it'll be replayed with a new question.")
+            setStatus('paused')
+          }
+          break
+        case 'opponent_reconnected':
+          setOpponentAway(null)
+          break
+        case 'round_voided':
+          setScore(message.score)
+          setStatus('paused')
+          break
+        case 'resume':
+          // We're back (after a drop or a page refresh): catch up on the match so far.
+          setOpponent(message.opponent)
+          setRated(message.rated)
+          setScore(message.score)
+          setHistory(message.history)
+          setRound(null)
+          setPauseNote(
+            message.opponent_connected
+              ? "you're back in. next round coming up..."
+              : `you're back in. waiting for ${message.opponent}...`,
+          )
+          setStatus('paused')
+          break
+        case 'resuming':
+          setOpponentAway(null)
+          setCountdown(message.in)
+          setPauseNote("everyone's here. resuming...")
+          setStatus('paused')
+          break
         case 'match_over':
           done = true
           setOver(message)
           setScore(message.score)
+          setOpponentAway(null)
           setStatus('over')
           if (effectsRef.current) {
             if (message.result === 'win') victory()
@@ -148,20 +245,71 @@ export default function CodeOff({ code, effects, onExit, onNewMatch, onLiveChang
           setError(message.message)
           setStatus('error')
           break
+        case 'ping':
+          break
       }
     }
 
-    ws.onclose = () => {
-      if (!done) {
-        setError('Lost connection to the match.')
-        setStatus('error')
+    function connect() {
+      const current = new WebSocket(wsUrl(`/ws/matches/${code}`))
+      ws = current
+      socket.current = current
+
+      // No message for a while (not even a ping) means a dead line: drop it and reconnect.
+      const listen = () => {
+        clearTimeout(watchdog)
+        watchdog = setTimeout(() => current.close(), SILENCE_MS)
+      }
+
+      current.onopen = async () => {
+        listen()
+        const { data } = await supabase.auth.getSession()
+        current.send(JSON.stringify({ type: 'auth', token: data.session?.access_token ?? '' }))
+      }
+
+      current.onmessage = (event) => {
+        listen()
+        lostAt = null
+        tries = 0
+        handle(JSON.parse(event.data) as ServerMessage)
+      }
+
+      current.onclose = (event) => {
+        clearTimeout(watchdog)
+        if (done || current !== ws) return
+        if (event.code === 4000) {
+          done = true
+          setError('this match is open in another tab now.')
+          setStatus('error')
+          return
+        }
+        lostAt ??= Date.now()
+        const left = RECONNECT_MS - (Date.now() - lostAt)
+        if (left <= 0) {
+          done = true
+          setError(
+            "couldn't get back in time. if the match was still going, it counted as a forfeit.",
+          )
+          setStatus('error')
+          return
+        }
+        setReconnectBy(lostAt + RECONNECT_MS)
+        setStatus('reconnecting')
+        retry = setTimeout(connect, Math.min(3000, 500 * 2 ** tries++))
       }
     }
 
-    // Leaving the screen closes the connection (mid-match, that's a forfeit).
+    connect()
+
+    // Leaving the screen on purpose: tell the server right away (mid-match, that's a forfeit).
     return () => {
       done = true
-      ws.close()
+      clearTimeout(retry)
+      clearTimeout(watchdog)
+      if (liveRef.current && ws?.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'forfeit' }))
+      }
+      ws?.close()
     }
   }, [code, away])
 
@@ -203,6 +351,48 @@ export default function CodeOff({ code, effects, onExit, onNewMatch, onLiveChang
         <button className="link" onClick={onExit}>
           ← back to menu
         </button>
+      </div>
+    )
+  }
+
+  if (status === 'reconnecting') {
+    return (
+      <div className="codeoff-center">
+        <h2 className="over-title">connection lost</h2>
+        <p className="waiting-dots">
+          reconnecting<span>.</span>
+          <span>.</span>
+          <span>.</span>
+        </p>
+        <p className="picker-hint">
+          the match is paused for both of you. {secondsLeft(reconnectBy, now, 30)}s to get back.
+        </p>
+        <button className="link" onClick={onExit}>
+          leave match
+        </button>
+      </div>
+    )
+  }
+
+  if (status === 'paused') {
+    return (
+      <div className="codeoff-center">
+        <p className="vs">
+          you <span className="vs-x">vs</span> <span className="you">{opponent}</span>
+        </p>
+        <p className="final-score">
+          {score.you} <span className="dash">—</span> {score.opponent}
+        </p>
+        {opponentAway ? (
+          <OpponentAway name={opponent} seconds={secondsLeft(opponentAway.until, now, 30)} />
+        ) : (
+          countdown > 0 && (
+            <p key={countdown} className="countdown">
+              {countdown}
+            </p>
+          )
+        )}
+        {pauseNote && <p className="picker-hint">{pauseNote}</p>}
       </div>
     )
   }
@@ -271,6 +461,10 @@ export default function CodeOff({ code, effects, onExit, onNewMatch, onLiveChang
         </div>
       </div>
 
+      {opponentAway && (
+        <OpponentAway name={opponent} seconds={secondsLeft(opponentAway.until, now, 30)} />
+      )}
+
       <QuestionCard
         question={round.question}
         roundKey={`${code}-${round.round}`}
@@ -304,6 +498,16 @@ export default function CodeOff({ code, effects, onExit, onNewMatch, onLiveChang
         </div>
       )}
     </div>
+  )
+}
+
+// "<name> lost connection · 23s to get back". Their round counts as a miss if
+// they've used their replay; otherwise it's thrown away.
+function OpponentAway({ name, seconds }: { name: string; seconds: number }) {
+  return (
+    <p className="opp-away" role="status">
+      {name} lost connection · {seconds}s to get back
+    </p>
   )
 }
 
@@ -371,7 +575,9 @@ function MatchOver({
         ? 'you got outcoded'
         : 'dead even'
   const subtitle = over.forfeit
-    ? `${name} rage-quit. a win's a win.`
+    ? over.forfeit_reason === 'disconnected'
+      ? `${name} lost connection and didn't make it back. a win's a win.`
+      : `${name} rage-quit. a win's a win.`
     : over.result === 'win'
       ? name
       : over.result === 'loss'

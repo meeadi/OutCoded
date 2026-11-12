@@ -8,17 +8,34 @@ import Results from './Results'
 
 type Phase = 'loading' | 'question' | 'submitting' | 'result' | 'summary' | 'error'
 
+
+// Progress survives a refresh or a dropped connection: the rush picks up where
+// it left off (with a fresh question; the one on screen is skipped, not counted).
+export const RUSH_KEY = 'rush-progress'
+
+function savedRounds(): Round[] {
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(RUSH_KEY) ?? '[]')
+    return Array.isArray(saved) ? saved : []
+  } catch {
+    return []
+  }
+}
+
 type Props = {
   effects: boolean
 }
 
 export default function PuzzleRush({ effects }: Props) {
-  const [phase, setPhase] = useState<Phase>('loading')
+  const [resumed] = useState(savedRounds)
+  const [phase, setPhase] = useState<Phase>(
+    resumed.length >= SESSION_LENGTH ? 'summary' : 'loading',
+  )
   const [current, setCurrent] = useState<NextQuestion | null>(null)
   const [picked, setPicked] = useState<number | null>(null)
   const [result, setResult] = useState<AnswerResult | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [rounds, setRounds] = useState<Round[]>([])
+    const [rounds, setRounds] = useState<Round[]>(resumed)
   const away = useAwayTimer()
 
   const showQuestion = useCallback(
@@ -84,8 +101,15 @@ export default function PuzzleRush({ effects }: Props) {
     [phase, current, rounds, effects, showError, away],
   )
 
-  // Load the first question when the component appears.
+  // Remember progress in this tab; forget it when the player leaves the rush.
   useEffect(() => {
+    sessionStorage.setItem(RUSH_KEY, JSON.stringify(rounds))
+  }, [rounds])
+  useEffect(() => () => sessionStorage.removeItem(RUSH_KEY), [])
+
+  // Load the first question when the component appears (unless the rush is already over).
+  useEffect(() => {
+    if (resumed.length >= SESSION_LENGTH) return
     let cancelled = false
     api
       .nextQuestion()
@@ -94,7 +118,7 @@ export default function PuzzleRush({ effects }: Props) {
     return () => {
       cancelled = true
     }
-  }, [showQuestion, showError])
+  }, [resumed, showQuestion, showError])
 
   // Keyboard: 1-4 to answer, Enter or Space for the next question.
   useEffect(() => {

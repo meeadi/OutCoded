@@ -6,7 +6,7 @@ import Leaderboard from './Leaderboard'
 import LoadingScreen from './LoadingScreen'
 import Menu from './Menu'
 import PlayerPage from './PlayerPage'
-import PuzzleRush from './PuzzleRush'
+import PuzzleRush, { RUSH_KEY } from './PuzzleRush'
 import Queue from './Queue'
 import type { NavState, NavTarget } from './SideMenu'
 import UsernamePicker from './UsernamePicker'
@@ -25,10 +25,11 @@ type Mode =
   | { kind: 'leaderboard' }
   | { kind: 'player'; username: string }
 
-// An invite link looks like ...?match=abc123
+// An invite link looks like ...?match=abc123. A refresh mid-rush goes back to the rush.
 function initialMode(): Mode {
   const code = new URLSearchParams(window.location.search).get('match')
-  return code ? { kind: 'codeoff', code } : { kind: 'menu' }
+  if (code) return { kind: 'codeoff', code }
+  return sessionStorage.getItem(RUSH_KEY) ? { kind: 'solo' } : { kind: 'menu' }
 }
 
 function setMatchInUrl(code: string | null) {

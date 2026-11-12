@@ -112,8 +112,12 @@ async def match_socket(websocket: WebSocket, code: str) -> None:
                 message = await websocket.receive_json()
             except ValueError:
                 continue  # not valid JSON; ignore it
-            if isinstance(message, dict) and message.get("type") == "answer":
+            if not isinstance(message, dict):
+                continue
+            if message.get("type") == "answer":
                 await room.handle_answer(user_id, message.get("choice"), message.get("away_ms"))
+            elif message.get("type") == "forfeit":
+                await room.forfeit(user_id)
     except WebSocketDisconnect:
         pass
     finally:
