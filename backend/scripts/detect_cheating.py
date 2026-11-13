@@ -34,6 +34,7 @@ ANSWERS = """
     join public.questions q on q.id = a.question_id
     where a.answered_at is not null
       and a.response_ms is not null
+      and a.variant is distinct from 'zen'  -- untimed practice: slow answers mean nothing
 """
 
 UPSERT = """

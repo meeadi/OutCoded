@@ -11,7 +11,7 @@ from app.config import get_settings
 
 ANSWERS = """
     select user_id, question_id, mode, shown_at, response_ms,
-           coalesce(is_correct, false) as is_correct, timed_out, chosen_index, away_ms
+           coalesce(is_correct, false) as is_correct, timed_out, chosen_index, away_ms, variant
     from public.attempts
     where answered_at is not null
 """

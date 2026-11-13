@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useState, type RefObject } from 'react'
 import { api, type Profile } from '../lib/api'
+import { savedSession, type PracticeSettings } from '../lib/practice'
 import { supabase } from '../lib/supabase'
 import CodeOff from './CodeOff'
 import Leaderboard from './Leaderboard'
 import LoadingScreen from './LoadingScreen'
 import Menu from './Menu'
 import PlayerPage from './PlayerPage'
-import PuzzleRush, { RUSH_KEY } from './PuzzleRush'
+import Practice from './Practice'
+import PracticeHub from './PracticeHub'
 import Queue from './Queue'
 import type { NavState, NavTarget } from './SideMenu'
 import UsernamePicker from './UsernamePicker'
@@ -19,17 +21,19 @@ type Props = {
 
 type Mode =
   | { kind: 'menu' }
-  | { kind: 'solo' }
+  | { kind: 'hub' } // practice: pick topics, difficulty and mode
+  | { kind: 'practice'; settings: PracticeSettings }
   | { kind: 'queue' }
   | { kind: 'codeoff'; code: string }
   | { kind: 'leaderboard' }
   | { kind: 'player'; username: string }
 
-// An invite link looks like ...?match=abc123. A refresh mid-rush goes back to the rush.
+// An invite link looks like ...?match=abc123. A refresh mid-practice goes back to it.
 function initialMode(): Mode {
   const code = new URLSearchParams(window.location.search).get('match')
   if (code) return { kind: 'codeoff', code }
-  return sessionStorage.getItem(RUSH_KEY) ? { kind: 'solo' } : { kind: 'menu' }
+  const saved = savedSession()
+  return saved ? { kind: 'practice', settings: saved.settings } : { kind: 'menu' }
 }
 
 function setMatchInUrl(code: string | null) {
@@ -101,9 +105,9 @@ export default function Home({ effects, navigateRef, onNavState }: Props) {
   useEffect(() => {
     navigateRef.current = (target: NavTarget) => {
       if (target === 'menu') goToMenu()
-      else if (target === 'solo') {
+      else if (target === 'practice') {
         setMatchInUrl(null)
-        setMode({ kind: 'solo' })
+        setMode({ kind: 'hub' })
       } else if (target === 'ranked') findRanked()
       else if (target === 'friend') startFriendMatch()
       else if (target === 'leaderboard') {
@@ -123,7 +127,9 @@ export default function Home({ effects, navigateRef, onNavState }: Props) {
           : null
         : mode.kind === 'codeoff'
           ? null
-          : mode.kind
+          : mode.kind === 'hub' || mode.kind === 'practice'
+            ? 'practice'
+            : mode.kind
   const ready = Boolean(profile?.username)
   useEffect(() => {
     onNavState(ready ? { current, inMatch: matchLive } : null)
@@ -158,7 +164,7 @@ export default function Home({ effects, navigateRef, onNavState }: Props) {
             <Menu
               rating={profile.rating}
               rd={profile.rating_deviation}
-              onSolo={() => setMode({ kind: 'solo' })}
+              onPractice={() => setMode({ kind: 'hub' })}
               onRanked={findRanked}
               onFriend={startFriendMatch}
               onLeaderboard={() => setMode({ kind: 'leaderboard' })}
@@ -167,7 +173,19 @@ export default function Home({ effects, navigateRef, onNavState }: Props) {
             {error && <p className="auth-message">{error}</p>}
           </>
         )}
-        {mode.kind === 'solo' && <PuzzleRush effects={effects} />}
+        {mode.kind === 'hub' && (
+          <PracticeHub
+            onStart={(settings) => setMode({ kind: 'practice', settings })}
+            onBack={goToMenu}
+          />
+        )}
+        {mode.kind === 'practice' && (
+          <Practice
+            settings={mode.settings}
+            effects={effects}
+            onChangeSettings={() => setMode({ kind: 'hub' })}
+          />
+        )}
         {mode.kind === 'queue' && <Queue onMatched={joinMatch} onCancel={goToMenu} />}
         {mode.kind === 'leaderboard' && (
           <Leaderboard me={profile.username} onOpenPlayer={openPlayer} />

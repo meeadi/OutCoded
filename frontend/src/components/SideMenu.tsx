@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 
-export type NavTarget = 'menu' | 'solo' | 'ranked' | 'friend' | 'leaderboard' | 'profile'
+export type NavTarget = 'menu' | 'practice' | 'ranked' | 'friend' | 'leaderboard' | 'profile'
 
 export type NavState = {
   current: NavTarget | null // the screen you're on, highlighted in the menu
@@ -9,7 +9,7 @@ export type NavState = {
 
 const ITEMS: { id: NavTarget; label: string; hint: string }[] = [
   { id: 'menu', label: 'menu', hint: 'back to the start' },
-  { id: 'solo', label: 'solo rush', hint: 'you vs the clock' },
+  { id: 'practice', label: 'practice', hint: 'pick topics, modes, your pace' },
   { id: 'ranked', label: 'ranked code-off', hint: 'rating on the line' },
   { id: 'friend', label: 'code-off a friend', hint: 'send a link' },
   { id: 'leaderboard', label: 'leaderboard', hint: "who's cracked" },

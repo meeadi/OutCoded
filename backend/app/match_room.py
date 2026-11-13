@@ -355,7 +355,8 @@ class MatchRoom:
                        options, correct_index, explanation, time_limit_s,
                        rating, rating_deviation
                 from public.questions
-                where status = 'active' and not (id = any($1::uuid[]))
+                where status = 'active' and pool in ('ranked', 'both')
+                  and not (id = any($1::uuid[]))
                 order by random()
                 limit 1
                 """,

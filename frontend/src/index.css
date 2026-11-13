@@ -2348,3 +2348,183 @@ html[data-fx="off"] .scene *::after {
     animation-play-state: paused !important;
   }
 }
+
+/* ---------- Practice ---------- */
+.practice {
+  width: 640px;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.practice .auth-title {
+  text-align: center;
+}
+
+.practice-section {
+  display: grid;
+  gap: 10px;
+}
+
+.practice-label {
+  color: var(--sub);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--edge);
+  font-size: 0.85rem;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.chip:not(:disabled):hover {
+  border-color: var(--accent);
+}
+
+.chip.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--bg);
+}
+
+.chip:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.chip-count {
+  font-size: 0.7rem;
+  opacity: 0.75;
+}
+
+.segmented {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.segmented button {
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 2px solid var(--edge);
+  transition: border-color 0.15s ease;
+}
+
+.segmented button:hover,
+.segmented button.on {
+  border-color: var(--accent);
+}
+
+.segment-name {
+  font-weight: 700;
+}
+
+.segmented button.on .segment-name {
+  color: var(--accent);
+}
+
+.segment-hint {
+  color: var(--sub);
+  font-size: 0.7rem;
+}
+
+.practice-modes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 8px;
+}
+
+.practice-mode {
+  padding: 12px 14px;
+}
+
+.practice-mode .mode-name {
+  font-size: 1rem;
+}
+
+.practice-mode.on {
+  border-color: var(--accent);
+}
+
+.practice-mode.on .mode-name {
+  color: var(--accent);
+}
+
+.practice-start {
+  align-self: center;
+  padding: 12px 36px;
+  font-size: 1rem;
+}
+
+.practice-note,
+.widened-note {
+  color: var(--sub);
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+.blitz-clock {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.blitz-clock.low {
+  color: var(--wrong);
+}
+
+.blitz-bar {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.blitz-bar > div {
+  height: 100%;
+  background: var(--accent);
+  transition: width 1s linear;
+}
+
+.end-session {
+  align-self: center;
+  font-size: 0.8rem;
+}
+
+.score-big {
+  font-size: 4.5rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--accent);
+  text-shadow: var(--glow);
+  animation: slam 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.new-best {
+  color: var(--correct);
+  font-weight: 700;
+  animation: fade-up 0.4s 0.5s ease-out backwards;
+}
+
+@media (max-width: 600px) {
+  .segmented {
+    grid-template-columns: 1fr;
+  }
+}

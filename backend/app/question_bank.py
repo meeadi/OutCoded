@@ -10,9 +10,16 @@ from dataclasses import dataclass, field
 FORMATS = {"predict_output", "spot_bug", "quickfire"}
 DIFFICULTIES = {"easy", "medium", "hard"}
 STATUSES = {"draft", "active", "retired"}
+POOLS = {"practice", "ranked", "both"}  # practice teaches, ranked tests
+# Must match the topics table (migration 007). Add new topics in both places.
+TOPICS = {
+    "python", "javascript", "sql", "dsa", "java", "c-cpp",
+    "git-linux", "web", "security", "databases",
+}
 OPTION_COLUMNS = ["option_a", "option_b", "option_c", "option_d"]
+# "topic" can also be called "category" (older files use that name).
 REQUIRED_COLUMNS = {
-    "slug", "format", "category", "language", "difficulty", "prompt", "code",
+    "slug", "format", "language", "difficulty", "prompt", "code",
     *OPTION_COLUMNS, "correct", "explanation", "time_limit_s", "status",
 }
 SLUG_PATTERN = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
@@ -39,6 +46,8 @@ def validate_rows(rows: list[dict], columns: list[str]) -> ValidationResult:
     result = ValidationResult()
 
     missing = REQUIRED_COLUMNS - set(columns)
+    if "topic" not in columns and "category" not in columns:
+        missing.add("topic")
     if missing:
         result.errors.append(f"Missing columns: {', '.join(sorted(missing))}")
         return result
@@ -46,7 +55,9 @@ def validate_rows(rows: list[dict], columns: list[str]) -> ValidationResult:
     seen_slugs: set[str] = set()
     for number, raw in enumerate(rows, start=1):
         slug = _clean(raw.get("slug"))
-        where = f"Row {number} ({slug or 'no slug'})"
+        source = raw.get("_file")
+        row_number = raw.get("_row", number)
+        where = f"{source + ', ' if source else ''}row {row_number} ({slug or 'no slug'})"
         errors: list[str] = []
 
         if not SLUG_PATTERN.match(slug):
@@ -67,7 +78,15 @@ def validate_rows(rows: list[dict], columns: list[str]) -> ValidationResult:
         if status not in STATUSES:
             errors.append(f"status must be one of {sorted(STATUSES)}")
 
-        for name in ("category", "prompt", "explanation"):
+        topic = _clean(raw.get("topic") or raw.get("category")).lower()
+        if topic not in TOPICS:
+            errors.append(f"topic must be one of {sorted(TOPICS)}")
+
+        pool = _clean(raw.get("pool")).lower() or "both"
+        if pool not in POOLS:
+            errors.append(f"pool must be one of {sorted(POOLS)}")
+
+        for name in ("prompt", "explanation"):
             if not _clean(raw.get(name)):
                 errors.append(f"{name} is empty")
 
@@ -108,7 +127,8 @@ def validate_rows(rows: list[dict], columns: list[str]) -> ValidationResult:
             {
                 "slug": slug,
                 "format": fmt,
-                "category": _clean(raw.get("category")).lower(),
+                "category": topic,
+                "pool": pool,
                 "language": _clean(raw.get("language")).lower() or None,
                 "difficulty": difficulty,
                 "prompt": _clean(raw.get("prompt")),

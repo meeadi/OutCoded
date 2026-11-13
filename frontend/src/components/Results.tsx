@@ -1,36 +1,97 @@
 import { useEffect } from 'react'
+import type { Variant } from '../lib/practice'
 import { bestStreak, rankFor, type Round } from '../lib/session'
 
 type Props = {
   rounds: Round[]
+  variant: Variant
+  note: string | null // why the session ended ("time's up.")
+  best: number | null // previous personal best (blitz, survival), if not beaten
+  newBest: boolean
   onRestart: () => void
+  onChangeSettings: () => void
 }
 
-export default function Results({ rounds, onRestart }: Props) {
+// The end of a practice session. Rush gets a rank letter; blitz and survival a
+// score against your personal best; zen and review a simple tally.
+export default function Results({
+  rounds,
+  variant,
+  note,
+  best,
+  newBest,
+  onRestart,
+  onChangeSettings,
+}: Props) {
   const correct = rounds.filter((r) => r.correct).length
-  const accuracy = Math.round((correct / rounds.length) * 100)
-  const averageSeconds = rounds.reduce((sum, r) => sum + r.ms, 0) / rounds.length / 1000
-  const slowest = Math.max(...rounds.map((r) => r.ms))
-  const rank = rankFor(correct, rounds.length)
+  const total = rounds.length
 
-  // Enter or Space starts a new session.
+  // Enter or Space plays again; Esc goes back to the practice settings.
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
       if (event.key === 'Enter' || event.key === ' ') {
         event.preventDefault()
         onRestart()
-      }
+      } else if (event.key === 'Escape') onChangeSettings()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onRestart])
+  }, [onRestart, onChangeSettings])
+
+  const buttons = (
+    <>
+      <button className="btn-primary" onClick={onRestart}>
+        play again
+      </button>
+      <p className="hint">
+        or press enter ·{' '}
+        <button className="link" onClick={onChangeSettings}>
+          change topics or mode (esc)
+        </button>
+      </p>
+    </>
+  )
+
+  if (total === 0) {
+    return (
+      <div className="results">
+        <p className="rank-line">{note ?? 'nothing answered this time.'}</p>
+        {buttons}
+      </div>
+    )
+  }
+
+  const accuracy = Math.round((correct / total) * 100)
+  const averageSeconds = rounds.reduce((sum, r) => sum + r.ms, 0) / total / 1000
+  const slowest = Math.max(...rounds.map((r) => r.ms))
+  const rank = rankFor(correct, total)
+  const headline =
+    variant === 'blitz'
+      ? { value: correct, label: 'correct in 60 seconds' }
+      : variant === 'survival'
+        ? { value: bestStreak(rounds), label: 'in a row' }
+        : variant === 'review'
+          ? { value: `${correct}/${total}`, label: 'mistakes fixed' }
+          : { value: `${correct}/${total}`, label: 'right' }
 
   return (
     <div className="results">
-      <div className="results-head">
-        <span className={`rank rank-${rank.letter}`}>{rank.letter}</span>
-        <p className="rank-line">{rank.line}</p>
-      </div>
+      {variant === 'rush' ? (
+        <div className="results-head">
+          <span className={`rank rank-${rank.letter}`}>{rank.letter}</span>
+          <p className="rank-line">{rank.line}</p>
+        </div>
+      ) : (
+        <div className="results-head">
+          <span className="score-big">{headline.value}</span>
+          <p className="rank-line">
+            {headline.label}
+            {note && ` · ${note}`}
+          </p>
+          {newBest && <p className="new-best">new personal best!</p>}
+          {best !== null && best > 0 && <p className="practice-note">your best: {best}</p>}
+        </div>
+      )}
 
       <div className="results-stats">
         <div>
@@ -66,10 +127,7 @@ export default function Results({ rounds, onRestart }: Props) {
       </div>
       <p className="chart-caption">time per question · green = right, red = wrong</p>
 
-      <button className="btn-primary" onClick={onRestart}>
-        play again
-      </button>
-      <p className="hint">or press enter</p>
+      {buttons}
     </div>
   )
 }

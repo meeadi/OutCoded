@@ -6,6 +6,7 @@ type Props = {
   question: Question
   roundKey: string // changes for every new question, which restarts the timer
   running: boolean // the timer drains while this is true
+  timed?: boolean // false: no timer at all (zen practice, blitz has its own clock)
   picked: number | null // position the player chose, if any
   correctChoice: number | null // set once the answer is revealed
   disabled: boolean
@@ -17,6 +18,7 @@ export default function QuestionCard({
   question,
   roundKey,
   running,
+  timed = true,
   picked,
   correctChoice,
   disabled,
@@ -40,6 +42,7 @@ export default function QuestionCard({
     <>
       {/* The key restarts the animations for every new question.
           In the last 5 seconds the bar turns red and starts to glow. */}
+      {timed && (    
       <div
         key={roundKey}
         className="timer"
@@ -57,6 +60,7 @@ export default function QuestionCard({
           }}
         />
       </div>
+      )}
 
       <p className="meta">
         {question.category} · {question.difficulty}

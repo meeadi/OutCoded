@@ -1,3 +1,4 @@
+import type { PracticeSettings, Preset } from './practice'
 import { supabase } from './supabase'
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
@@ -18,6 +19,19 @@ export type Question = {
 export type NextQuestion = {
   attempt_id: string
   question: Question
+  widened: boolean // the chosen difficulty ran dry, so this one comes from outside it
+}
+
+export type PracticeTopic = {
+  id: string
+  name: string
+  counts: Record<Preset | 'all', number> // questions per difficulty preset
+  mistakes: number // questions you last got wrong (for review)
+}
+
+export type PracticeTopics = {
+  rating: number
+  topics: PracticeTopic[]
 }
 
 export type AnswerResult = {
@@ -123,7 +137,13 @@ export function wsUrl(path: string): string {
 export const api = {
   me: () => request<Profile>('GET', '/me'),
   setUsername: (username: string) => request<Profile>('PUT', '/me/username', { username }),
-  nextQuestion: () => request<NextQuestion>('POST', '/solo/next'),
+  practiceTopics: () => request<PracticeTopics>('GET', '/solo/topics'),
+  nextQuestion: (settings: PracticeSettings) =>
+    request<NextQuestion>('POST', '/solo/next', {
+      topics: settings.topics,
+      preset: settings.preset,
+      variant: settings.variant,
+    }),
   submitAnswer: (attemptId: string, choice: number | null, awayMs: number) =>
     request<AnswerResult>('POST', '/solo/answer', { attempt_id: attemptId, choice, away_ms: awayMs }),
   createMatch: () => request<{code: string} > ('POST', '/matches'),

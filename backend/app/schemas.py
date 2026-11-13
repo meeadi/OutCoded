@@ -3,6 +3,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from app.practice import Preset, Variant
+
 
 class ServedQuestion(BaseModel):
     """What the player sees. Deliberately has no correct answer in it."""
@@ -22,6 +24,27 @@ class ServedQuestion(BaseModel):
 class NextQuestionResponse(BaseModel):
     attempt_id: UUID
     question: ServedQuestion
+    widened: bool = False  # the chosen difficulty ran dry, so this one is from outside it
+
+
+class PracticeRequest(BaseModel):
+    """What to practice. Everything is optional: no body means a plain rush on all topics."""
+
+    topics: list[str] = Field(default_factory=list, max_length=20)  # empty = all topics
+    preset: Preset | None = None  # chill / level / pain; None = any difficulty
+    variant: Variant = "rush"
+
+
+class PracticeTopic(BaseModel):
+    id: str
+    name: str
+    counts: dict[str, int]  # questions per preset: chill, level, pain, all
+    mistakes: int  # questions this player last got wrong (for review mode)
+
+
+class PracticeTopicsResponse(BaseModel):
+    rating: float
+    topics: list[PracticeTopic]
 
 
 class AnswerRequest(BaseModel):

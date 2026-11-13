@@ -3,7 +3,7 @@ from pathlib import Path
 
 from app.question_bank import REQUIRED_COLUMNS, validate_rows
 
-COLUMNS = sorted(REQUIRED_COLUMNS)
+COLUMNS = sorted(REQUIRED_COLUMNS | {"category"}) 
 
 
 def make_row(**overrides) -> dict:
@@ -81,3 +81,27 @@ def test_seed_file_is_valid():
         result = validate_rows(rows, list(reader.fieldnames))
     assert result.ok, result.errors
     assert len(result.questions) >= 20
+
+def test_topic_column_can_be_called_topic_or_category():
+    row = make_row(category="", topic="sql")
+    del row["category"]
+    columns = [c for c in COLUMNS if c != "category"] + ["topic"]
+    result = validate_rows([row], columns)
+    assert result.ok and result.questions[0]["category"] == "sql"
+
+
+def test_unknown_topics_are_rejected():
+    result = validate_rows([make_row(category="postgres")], COLUMNS)
+    assert any("topic must be one of" in e for e in result.errors)
+
+
+def test_pool_defaults_to_both_and_is_checked():
+    assert validate_rows([make_row()], COLUMNS).questions[0]["pool"] == "both"
+    assert validate_rows([make_row(pool="practice")], COLUMNS + ["pool"]).questions[0]["pool"] == "practice"
+    bad = validate_rows([make_row(pool="casual")], COLUMNS + ["pool"])
+    assert any("pool must be one of" in e for e in bad.errors)
+
+
+def test_errors_name_the_file_and_row():
+    row = make_row(category="nope", _file="sql.csv", _row=7)
+    assert validate_rows([row], COLUMNS).errors[0].startswith("sql.csv, row 7")

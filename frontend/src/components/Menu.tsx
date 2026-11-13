@@ -4,7 +4,7 @@ import { formatRating } from '../lib/rating'
 type Props = {
   rating: number
   rd: number
-  onSolo: () => void
+  onPractice: () => void
   onRanked: () => void
   onFriend: () => void
   onLeaderboard: () => void
@@ -14,31 +14,31 @@ type Props = {
 export default function Menu({
   rating,
   rd,
-  onSolo,
+  onPractice,
   onRanked,
   onFriend,
   onLeaderboard,
   busy,
 }: Props) {
-  // Keyboard: 1 solo, 2 ranked, 3 friend, 4 leaderboard.
+  // Keyboard: 1 practice, 2 ranked, 3 friend, 4 leaderboard.
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
       if (busy) return
-      if (event.key === '1') onSolo()
+      if (event.key === '1') onPractice()
       if (event.key === '2') onRanked()
       if (event.key === '3') onFriend()
       if (event.key === '4') onLeaderboard()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onSolo, onRanked, onFriend, onLeaderboard, busy])
+  }, [onPractice, onRanked, onFriend, onLeaderboard, busy])
 
   return (
     <div className="menu">
-      <button className="mode" onClick={onSolo} disabled={busy}>
+      <button className="mode" onClick={onPractice} disabled={busy}>
         <span className="option-key">1</span>
-        <span className="mode-name">solo rush</span>
-        <span className="mode-desc">10 questions. just you and the clock.</span>
+        <span className="mode-name">practice</span>
+        <span className="mode-desc">pick topics and a mode. rush, blitz, survival, zen, review.</span>
       </button>
       <button className="mode" onClick={onRanked} disabled={busy}>
         <span className="option-key">2</span>

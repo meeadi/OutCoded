@@ -156,3 +156,9 @@ def test_a_question_nobody_answered_still_appears():
 def test_no_questions_gives_an_empty_table_with_the_right_columns():
     stats = metrics.question_stats(picks([]).iloc[0:0], question_frame().iloc[0:0])
     assert stats.empty and list(stats.columns) == metrics.QUESTION_COLUMNS
+
+def test_zen_and_review_answers_dont_count_towards_question_stats():
+    df = picks([0] * 10 + [1] * 10)
+    df["variant"] = ["zen"] * 10 + ["rush"] * 10  # the 10 right answers were all in zen
+    stats = metrics.question_stats(df, question_frame()).iloc[0]
+    assert stats["answers"] == 10 and stats["accuracy"] == 0

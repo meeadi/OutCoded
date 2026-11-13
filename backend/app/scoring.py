@@ -8,6 +8,7 @@ import asyncpg
 
 from app import game, glicko2
 from app.events import log_event
+from app.practice import NO_CALIBRATION, UNTIMED
 
 
 class AttemptNotFound(Exception):
@@ -46,7 +47,7 @@ async def score_attempt(
         # Lock the attempt row so a double-click can't be scored twice.
         row = await conn.fetchrow(
             """
-            select a.question_id, a.option_order, a.answered_at, a.mode,
+            select a.question_id, a.option_order, a.answered_at, a.mode, a.variant,
                    q.correct_index, q.explanation, q.time_limit_s,
                    (extract(epoch from clock_timestamp() - a.shown_at) * 1000)::int as elapsed_ms
             from public.attempts a
@@ -72,7 +73,11 @@ async def score_attempt(
 
         response_ms = row["elapsed_ms"]
         # No choice means the player's timer ran out; otherwise check against server time.
-        timed_out = chosen is None or game.is_timed_out(response_ms, row["time_limit_s"], grace_ms)
+        # Zen practice has no clock at all.
+        untimed = row["variant"] in UNTIMED
+        timed_out = chosen is None or (
+            not untimed and game.is_timed_out(response_ms, row["time_limit_s"], grace_ms)
+        )
         correct = not timed_out and chosen == row["correct_index"]
         points = (
             game.match_points(correct, response_ms, row["time_limit_s"])
@@ -80,7 +85,11 @@ async def score_attempt(
             else 0
         )
 
-        question_rating = await _calibrate_question(conn, row["question_id"], user_id, correct)
+        # Untimed answers and re-tries say little about how hard a question is.
+        if row["variant"] in NO_CALIBRATION:
+            question_rating = (None, None)
+        else:
+            question_rating = await _calibrate_question(conn, row["question_id"], user_id, correct)
 
         await conn.execute(
             """
@@ -105,6 +114,7 @@ async def score_attempt(
             attempt_id=attempt_id,
             question_id=row["question_id"],
             mode=row["mode"],
+            variant=row["variant"],
             correct=correct,
             timed_out=timed_out,
             response_ms=response_ms,
@@ -124,7 +134,7 @@ async def score_attempt(
 
 async def _calibrate_question(
     conn: asyncpg.Connection, question_id: UUID, user_id: UUID, correct: bool
-) -> tuple[float, float]:
+) -> tuple[float | None, float | None]:
     """Update the question's difficulty rating from this answer. Returns (before, after)."""
     question = await conn.fetchrow(
         """

@@ -162,6 +162,9 @@ QUESTION_COLUMNS = [
 def question_stats(answers: pd.DataFrame, questions: pd.DataFrame) -> pd.DataFrame:
     """One row per question: how often it's answered, how hard it really is,
     how long people take, and which wrong option fools them most."""
+    # Untimed (zen) and re-try (review) practice answers say little about a question.
+    if "variant" in answers.columns:
+        answers = answers[~answers["variant"].isin(["zen", "review"])]
     rows = []
     grouped = dict(tuple(answers.groupby("question_id"))) if not answers.empty else {}
     for q in questions.itertuples():
